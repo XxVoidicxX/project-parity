@@ -1,0 +1,3 @@
+export class AlertDispatcher { constructor(strategies = []) { this.strategies = strategies; } async dispatch(report) { await Promise.all(this.strategies.map(strategy => strategy.send(report))); } }
+export class WebhookAlertStrategy { constructor(url, fetcher = fetch) { this.url = url; this.fetcher = fetcher; } async send(report) { const response = await this.fetcher(this.url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(report) }); if (!response.ok) throw new Error(`Parity webhook failed: ${response.status}`); } }
+export class DirectMessageAlertStrategy { constructor(user) { this.user = user; } async send(report) { await this.user.send({ content: JSON.stringify(report) }); } }

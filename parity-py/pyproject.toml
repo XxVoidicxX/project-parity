@@ -1,0 +1,6 @@
+[project]
+name = "project-parity-py"
+version = "1.0.0"
+requires-python = ">=3.10"
+[tool.setuptools.packages.find]
+where = ["."]
