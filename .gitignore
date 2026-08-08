@@ -4,3 +4,4 @@ __pycache__/
 .env
 *.token
 _codex_*.log
+live-test-report.json
