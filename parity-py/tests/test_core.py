@@ -70,6 +70,12 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(reports[0]['event']['targetId'], 'rogue')
         self.assertEqual(reports[1]['event']['actionType'], 'MESSAGE_CREATE')
 
+    async def test_normalizes_live_discord_js_channel_audit_action_and_target_fields(self):
+        listener = AuditListener(None, Reconciler(Ledger(clock=lambda: NOW), clock=lambda: NOW), AlertDispatcher(), lambda: 'bot')
+        for action, expected in [(10, 'CHANNEL_CREATE'), (11, 'CHANNEL_UPDATE'), (12, 'CHANNEL_DELETE')]:
+            normalized = listener.normalize_audit({'id':f'audit-{action}','action':action,'actionType':{10:'Create',11:'Update',12:'Delete'}[action],'targetId':'channel','targetType':'Channel','executorId':'bot','guildId':'guild','createdTimestamp':NOW})
+            self.assertEqual((normalized['actionType'], normalized['targetType']), (expected, 'channel'))
+
     async def test_500_exact_entries_leave_no_ledger_entries(self):
         ledger = Ledger(clock=lambda: NOW)
         await asyncio.gather(*(ledger.record(intent(targetId=str(i), correlationId=f'load-{i}')) for i in range(500)))

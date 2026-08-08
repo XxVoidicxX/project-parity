@@ -1,6 +1,6 @@
 import json, sys
 from pathlib import Path
-from parity_py import Ledger, Reconciler, ms
+from parity_py import AuditListener, Ledger, Reconciler, ms
 
 fixture=json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
 now=ms(fixture['clock'])
@@ -12,6 +12,9 @@ async def main():
     reports=[]
     for event in fixture['events']:
         report=await reconciler.reconcile(event)
+        if report: reports.append(report)
+    for raw in fixture.get('rawAuditEvents',[]):
+        report=await reconciler.reconcile(AuditListener.normalize_audit(raw))
         if report: reports.append(report)
     print(json.dumps(reports, sort_keys=True, separators=(',', ':')))
 

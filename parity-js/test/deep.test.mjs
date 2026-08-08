@@ -65,3 +65,11 @@ test('concurrent reconciliation serializes 1000 exact entries without leaks', as
   assert.ok(reports.every(report => report === null));
   assert.equal((await ledger.entries()).length, 0);
 });
+test('memory ledger purges 50000 expired entries within five seconds', async () => {
+  const ledger = new Ledger({ clock });
+  await Promise.all([...Array(50000)].map((_, index) => ledger.record(intent({ correlationId: `purge-${index}`, expiresAt: NOW - 1 }))));
+  const started = performance.now();
+  await ledger.purge(NOW + 120001);
+  assert.ok(performance.now() - started < 5000);
+  assert.equal((await ledger.entries()).length, 0);
+});

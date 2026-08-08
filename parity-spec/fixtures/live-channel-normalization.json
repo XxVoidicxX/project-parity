@@ -1,0 +1,14 @@
+{
+  "clock": "2026-08-07T12:00:00.000Z",
+  "intents": [
+    {"actionType":"CHANNEL_CREATE","targetId":"channel-create","targetType":"channel","guildId":"guild-live","correlationId":"live-create","timestamp":"2026-08-07T12:00:00.000Z"},
+    {"actionType":"CHANNEL_UPDATE","targetId":"channel-update","targetType":"channel","guildId":"guild-live","correlationId":"live-update","timestamp":"2026-08-07T12:00:00.000Z"},
+    {"actionType":"CHANNEL_DELETE","targetId":"channel-delete","targetType":"channel","guildId":"guild-live","correlationId":"live-delete","timestamp":"2026-08-07T12:00:00.000Z"}
+  ],
+  "events": [],
+  "rawAuditEvents": [
+    {"id":"live-audit-create","action":10,"actionType":"Create","targetId":"channel-create","targetType":"Channel","guildId":"guild-live","executorId":"bot","createdTimestamp":1786104000000},
+    {"id":"live-audit-update","action":11,"actionType":"Update","targetId":"channel-update","targetType":"Channel","guildId":"guild-live","executorId":"bot","createdTimestamp":1786104000000},
+    {"id":"live-audit-delete","action":12,"actionType":"Delete","targetId":"channel-delete","targetType":"Channel","guildId":"guild-live","executorId":"bot","createdTimestamp":1786104000000}
+  ]
+}

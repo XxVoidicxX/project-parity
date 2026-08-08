@@ -1,6 +1,6 @@
 # Project Parity
 
-**Version: 1.0.0**
+**Version: 1.0.1**
 
 **Project Parity is a drift watchdog for Discord bots.** Bot tokens get leaked, reused, or run by unauthorized processes, and Discord does not tell the intended bot process when that happens.
 

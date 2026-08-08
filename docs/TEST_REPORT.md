@@ -66,3 +66,61 @@ node tools/live-parity-check
 ```
 
 The last command skips successfully when `DISCORD_BOT_TOKEN` is absent. For an operator-run tenant check, follow [setup instructions](setup.md#live-discord-check), rotate the token first, set it only in the environment or ignored `.env`, and provide the required guild and test-channel identifiers.
+
+---
+
+## Version 1.0.1 live test results and hardening findings
+
+### Live test run against VSH Codebase - 2026-08-08
+
+The bot (Project Parity#0765, id 1535653385846394942) was connected to the "VSH Codebase" guild. All temporary test channels were created by the bot and deleted before the harness exited. No existing channels were touched.
+
+#### Live test results
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| Required permissions present (ViewAuditLog, ManageChannels, SendMessages) | Pass | |
+| Unrecorded channel create flagged as drift | Pass | actionType=Create, targetType=Channel (pre-fix shapes) |
+| Unrecorded channel update flagged as drift | Pass | actionType=Update, targetType=Channel |
+| Recorded legit update (learned normalized shape) produces no drift | Pass | Reconciled cleanly |
+| Naive-shape intent (CHANNEL_UPDATE / channel) reconciles | Fail | FALSE POSITIVE confirmed |
+| Unrecorded self-message flagged as drift | Pass | |
+| **Total** | **5/6** | The fail directly caused the 1.0.1 normalization fix |
+
+The failing check was the most valuable result of the run. It proved that a developer using the intuitive actionType string would get false-positive drift alerts on legitimate channel updates.
+
+#### Confirmed normalization bug and fix
+
+discord.js delivers the audit-log entry with `entry.action` as a numeric code (10, 11, 12) and `entry.actionType` as a generic category string ("Create", "Update", "Delete"). The previous `normalizeAudit()` preferred `entry.actionType` because it was non-null. Since `actionName()` passes strings through unchanged, the stored action was "Update" rather than "CHANNEL_UPDATE".
+
+The fix: prefer `entry.action` (numeric) over `entry.actionType` (category string). The existing action-name map already contained all the correct canonical names. Also: `targetType` from discord.js arrives capitalized ("Channel"). The normalizer now lowercases it unconditionally.
+
+After the fix, a developer recording `{ actionType: 'CHANNEL_UPDATE', targetType: 'channel' }` before a channel edit will get a clean reconciliation with no drift.
+
+#### Observed audit-log delivery latency
+
+The channel create at 2026-08-08T15:48:10 produced a drift event with `occurredAt: 2026-08-08T15:48:10.068Z`. This is a single data point with near-zero observed delivery lag. It cannot be generalized without a larger sample across varied conditions, but it suggests that the 120-second tolerance window is conservatively large for simple channel operations.
+
+#### Attack surfaces investigated (1.0.1 hardening)
+
+| Attack | Outcome |
+| --- | --- |
+| discord.js action/targetType normalization mismatch | Fixed; regression test added |
+| MEMBER_MOVE/DISCONNECT target extraction from entry.extra | Fixed; targetId now reads extra.channel.id first for those actions |
+| count=0, count=-1, count=999999 in burst event | Fixed; invalid counts clamp and report drift; no ledger entries consumed |
+| 50,000-entry purge performance | Holds; purge completes under 5 seconds |
+| Clock-skew expiry boundary | Holds; expiry is relative to event.occurredAt, not reconciler clock |
+| Dedup replay documentation | Documented in threat-model.md; correct by design |
+| Ledger poisoning orphan lifecycle | Holds; orphan consumed by first matching event, purged on schedule |
+| Concurrent record() race on duplicate check | Fixed; record() now serialized with a write queue |
+| Guild ID type coercion (integer vs string) | Holds; stringId() handles numeric guild IDs |
+| Prototype pollution via JSON.parse | Fixed; recordLocked() uses hasOwnProperty extraction |
+| DM from bot produces no drift | Holds; handleMessage() skips when guildId is absent |
+
+#### Updated suite counts after 1.0.1
+
+| Suite | Count | Result |
+| --- | --- | --- |
+| Root spec + cross-language | 4 | Pass |
+| JavaScript unit, hardening, stress | 18 | Pass |
+| Python unit, hardening, stress | 14 | Pass |
