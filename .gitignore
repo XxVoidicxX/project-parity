@@ -1,4 +1,4 @@
 node_modules/
 __pycache__/
 *.pyc
-_codex_run.log
+_codex_*.log

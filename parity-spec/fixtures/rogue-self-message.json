@@ -1,0 +1,5 @@
+{
+  "clock": "2026-08-07T12:00:00.000Z",
+  "intents": [],
+  "events": [{"actionType":"MESSAGE_CREATE","targetId":"message-rogue","targetType":"message","guildId":"guild-1","executorId":"bot-1","auditEntryId":null,"occurredAt":"2026-08-07T12:00:00.000Z","count":1}]
+}

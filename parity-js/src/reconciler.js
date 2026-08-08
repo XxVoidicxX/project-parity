@@ -2,11 +2,18 @@ import { collapsedActions, nearestProjection, stringId } from './contract.js';
 const remediation = ['Immediately rotate the bot token.', 'Inspect running bot instances and deployment credentials.', 'Preserve this report and relevant Discord audit logs for investigation.'];
 const time = value => new Date(value).getTime();
 export class Reconciler {
-  constructor({ ledger, clock = () => Date.now(), toleranceMs = 120000 } = {}) { this.ledger = ledger; this.clock = clock; this.toleranceMs = toleranceMs; }
+  constructor({ ledger, clock = () => Date.now(), toleranceMs = 120000 } = {}) { this.ledger = ledger; this.clock = clock; this.toleranceMs = toleranceMs; this.queue = Promise.resolve(); }
   async reconcile(event) {
+    const previous = this.queue;
+    let release;
+    this.queue = new Promise(resolve => { release = resolve; });
+    await previous;
+    try { return await this.reconcileLocked(event); } finally { release(); }
+  }
+  async reconcileLocked(event) {
     const entries = await this.ledger.entries();
     const burst = collapsedActions.has(event.actionType) && event.count > 1;
-    const eligible = entries.filter(entry => entry.guildId === event.guildId && entry.actionType === event.actionType && Math.abs(time(entry.timestamp) - time(event.occurredAt)) <= this.toleranceMs);
+    const eligible = entries.filter(entry => entry.guildId === event.guildId && entry.actionType === event.actionType && entry.targetType === event.targetType && time(entry.expiresAt) >= time(event.occurredAt) && Math.abs(time(entry.timestamp) - time(event.occurredAt)) <= this.toleranceMs);
     if (burst) return this.reconcileBurst(event, eligible, entries);
     const exact = eligible.filter(entry => entry.targetId === event.targetId).sort((a, b) => time(a.timestamp) - time(b.timestamp) || a.correlationId.localeCompare(b.correlationId))[0];
     if (exact) { await this.ledger.remove(exact.correlationId); return null; }

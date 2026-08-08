@@ -1,0 +1,5 @@
+{
+  "clock": "2026-08-07T12:00:00.000Z",
+  "intents": [{"actionType":"CHANNEL_CREATE","targetId":"channel-intended","targetType":"channel","guildId":"guild-1","correlationId":"partial-1","timestamp":"2026-08-07T12:00:00.000Z"}],
+  "events": [{"actionType":"CHANNEL_CREATE","targetId":"channel-rogue","targetType":"channel","guildId":"guild-1","executorId":"bot-1","auditEntryId":"audit-2","occurredAt":"2026-08-07T12:00:00.000Z","count":1}]
+}

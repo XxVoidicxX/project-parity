@@ -6,7 +6,7 @@ All IDs are decimal strings. Timestamps are UTC ISO-8601 strings with millisecon
 
 ## Exact matching
 
-Normalize an audit event to `actionType`, `targetId`, `targetType`, and `guildId`. An intent matches when `actionType`, `targetId`, and `guildId` are exactly equal and the audit event occurs within tolerance. Target type is diagnostic and does not reject an otherwise exact match because Discord omits or changes target object shapes for several action classes. The oldest eligible exact intent is consumed. Each intent can reconcile one audit count unit.
+Normalize an audit event to `actionType`, `targetId`, `targetType`, and `guildId`. An intent matches only when all four fields are exactly equal, the event occurs within tolerance, and the intent has not expired at the event time; both tolerance and expiry boundaries are inclusive. The oldest eligible exact intent is consumed. Each intent can reconcile one audit count unit. This rejects an action against a differently typed target rather than allowing an ID collision to mask drift.
 
 ## Partial and expired matches
 
@@ -23,3 +23,7 @@ Plain message sends are not audit logged. Implementations reconcile self-authore
 ## Unknown audit actions
 
 Unknown numeric actions normalize to `UNKNOWN_<number>`. They remain observable but are never treated as legitimate without an exact corresponding ledger intent.
+
+## Canonical fixture output
+
+The shared fixture drivers use the fixture `clock` for every generated report timestamp and print one UTF-8 JSON array with no indentation. Object keys are recursively sorted in Unicode lexical order; arrays retain input/event order; timestamps are normalized to UTC millisecond ISO-8601; and no host-specific metadata is emitted. The cross-language test compares these complete JSON byte strings. Fixtures contain already-normalized incoming audit or self-message events, so listener-library object-shape normalization is tested separately.

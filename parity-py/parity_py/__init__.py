@@ -19,17 +19,25 @@ class SqliteLedgerAdapter:
 class Ledger:
     def __init__(self,adapter=None,ttl_ms=120000,clock=lambda: int(datetime.now().timestamp()*1000)): self.adapter=adapter or MemoryLedgerAdapter(); self.ttl_ms=ttl_ms; self.clock=clock
     async def record(self,i):
-        t=iso(i.get('timestamp',self.clock())); e={'actionType':str(i['actionType']),'targetId':str(i['targetId']),'targetType':str(i.get('targetType','unknown')),'guildId':str(i['guildId']),'timestamp':t,'correlationId':str(i.get('correlationId') or uuid.uuid4()),'expiresAt':iso(i.get('expiresAt',ms(t)+self.ttl_ms))};
+        action_type=str(i['actionType'])
+        if action_type.startswith('UNKNOWN_'): raise ValueError('Unknown audit actions cannot be ledgered until they are mapped')
+        correlation_id=str(i.get('correlationId') or uuid.uuid4())
+        if any(e['correlationId']==correlation_id for e in await self.entries()): raise ValueError(f'Duplicate correlationId: {correlation_id}')
+        t=iso(i.get('timestamp',self.clock())); e={'actionType':action_type,'targetId':str(i['targetId']),'targetType':str(i.get('targetType','unknown')),'guildId':str(i['guildId']),'timestamp':t,'correlationId':correlation_id,'expiresAt':iso(i.get('expiresAt',ms(t)+self.ttl_ms))};
         if 'metadata'in i:e['metadata']=i['metadata']
         await self.adapter.insert(e); return e
     async def entries(self): return await self.adapter.all()
     async def remove(self,k): await self.adapter.remove(k)
+    async def purge(self,now=None,retention_ms=None):
+        now=self.clock() if now is None else now; retention_ms=self.ttl_ms if retention_ms is None else retention_ms
+        for entry in await self.entries():
+            if ms(entry['expiresAt'])+retention_ms < now: await self.remove(entry['correlationId'])
 class Reconciler:
     def __init__(self,ledger,clock=lambda: int(datetime.now().timestamp()*1000),tolerance_ms=120000): self.ledger,self.clock,self.tolerance_ms,self.lock=ledger,clock,tolerance_ms,asyncio.Lock()
     async def reconcile(self,event):
       async with self.lock:
-        entries=await self.ledger.entries(); eligible=[e for e in entries if e['guildId']==event['guildId'] and e['actionType']==event['actionType'] and abs(ms(e['timestamp'])-ms(event['occurredAt']))<=self.tolerance_ms]
-        selected=sorted(eligible,key=lambda e:(ms(e['timestamp']),e['correlationId']))[:event.get('count',1)] if event['actionType'] in COLLAPSED and event.get('count',1)>1 else [e for e in eligible if e['targetId']==event['targetId']][:1]
+        entries=await self.ledger.entries(); eligible=[e for e in entries if e['guildId']==event['guildId'] and e['actionType']==event['actionType'] and e['targetType']==event['targetType'] and ms(e['expiresAt'])>=ms(event['occurredAt']) and abs(ms(e['timestamp'])-ms(event['occurredAt']))<=self.tolerance_ms]
+        selected=sorted(eligible,key=lambda e:(ms(e['timestamp']),e['correlationId']))[:event.get('count',1)] if event['actionType'] in COLLAPSED and event.get('count',1)>1 else sorted((e for e in eligible if e['targetId']==event['targetId']),key=lambda e:(ms(e['timestamp']),e['correlationId']))[:1]
         for e in selected: await self.ledger.remove(e['correlationId'])
         if len(selected)>=event.get('count',1): return None
         candidates=[e for e in entries if e['guildId']==event['guildId'] and e not in selected]
@@ -46,5 +54,12 @@ class AuditListener:
       e={**e,'actionType':ACTIONS.get(e['actionType'],e['actionType'] if isinstance(e['actionType'],str) else f"UNKNOWN_{e['actionType']}")}; r=await self.reconciler.reconcile(e)
       if r: await self.dispatcher.dispatch(r)
       return r
+    async def handle_message(self,message):
+      author=message.get('author',{})
+      if str(author.get('id'))!=str(self.bot_user_id()) or not message.get('guildId'): return None
+      event={'actionType':'MESSAGE_CREATE','targetId':str(message['id']),'targetType':'message','guildId':str(message['guildId']),'executorId':str(author['id']),'auditEntryId':None,'occurredAt':iso(message.get('createdTimestamp',0)),'count':1}
+      report=await self.reconciler.reconcile(event)
+      if report: await self.dispatcher.dispatch(report)
+      return report
 async def attach(client,**options):
     ledger=options.get('ledger',Ledger(clock=options.get('clock',lambda:int(datetime.now().timestamp()*1000)))); dispatcher=options.get('dispatcher',AlertDispatcher()); reconciler=options.get('reconciler',Reconciler(ledger,clock=options.get('clock',lambda:int(datetime.now().timestamp()*1000)))); return {'ledger':ledger,'reconciler':reconciler,'dispatcher':dispatcher,'listener':AuditListener(client,reconciler,dispatcher,options.get('bot_user_id',lambda:getattr(client.user,'id',None))),'intent':ledger.record}

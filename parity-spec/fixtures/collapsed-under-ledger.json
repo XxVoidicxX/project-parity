@@ -1,0 +1,5 @@
+{
+  "clock": "2026-08-07T12:00:00.000Z",
+  "intents": [{"actionType":"MESSAGE_DELETE","targetId":"message-1","targetType":"message","guildId":"guild-1","correlationId":"delete-1","timestamp":"2026-08-07T12:00:00.000Z"}],
+  "events": [{"actionType":"MESSAGE_DELETE","targetId":"message-1","targetType":"message","guildId":"guild-1","executorId":"bot-1","auditEntryId":"audit-3","occurredAt":"2026-08-07T12:00:00.000Z","count":2}]
+}
