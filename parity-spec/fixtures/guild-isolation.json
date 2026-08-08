@@ -1,0 +1,5 @@
+{
+  "clock": "2026-08-07T12:00:00.000Z",
+  "intents": [{"actionType":"ROLE_UPDATE","targetId":"role-1","targetType":"role","guildId":"guild-a","correlationId":"other-guild"}],
+  "events": [{"actionType":"ROLE_UPDATE","targetId":"role-1","targetType":"role","guildId":"guild-b","executorId":"bot-1","auditEntryId":"audit-isolated","occurredAt":"2026-08-07T12:00:00.000Z","count":1}]
+}

@@ -1,1 +1,1 @@
-{"name":"project-parity","private":true,"version":"1.0.0","workspaces":["parity-js"],"scripts":{"test:spec":"node --test tests/spec.test.mjs tests/cross-language.test.mjs","test":"npm run test:spec && npm run test --workspace=@project-parity/js"}}
+{"name":"project-parity","private":true,"version":"1.0.0","workspaces":["parity-js"],"scripts":{"test:spec":"node --test tests/spec.test.mjs tests/cross-language.test.mjs","test":"npm run test:spec && npm run test --workspace=@project-parity/js","benchmark":"node tools/run-benchmarks.mjs && node tools/render-benchmark-charts.mjs"}}

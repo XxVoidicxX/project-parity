@@ -1,0 +1,116 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-08-08T15:33:56.540Z",
+  "measurements": [
+    {
+      "language": "javascript",
+      "runtime": "v22.14.0",
+      "measuredAt": "2026-08-08T15:33:58.551Z",
+      "sizes": [
+        {
+          "size": 100,
+          "recordEntriesPerSecond": 62825.90940503852,
+          "reconcileLatencyMs": {
+            "p50": 0.3061999999999969,
+            "p90": 0.5807000000000002,
+            "p99": 0.7096000000000018,
+            "samples": 50
+          },
+          "reconcileBurstEntriesPerSecond": 10709.963479024538,
+          "ledger": {
+            "retainedEntries": 100,
+            "heapGrowthBytes": 595112,
+            "leakedEntriesAfterBurst": 0
+          }
+        },
+        {
+          "size": 1000,
+          "recordEntriesPerSecond": 177537.90434257704,
+          "reconcileLatencyMs": {
+            "p50": 3.0172000000000025,
+            "p90": 3.3153000000000077,
+            "p99": 4.083100000000002,
+            "samples": 50
+          },
+          "reconcileBurstEntriesPerSecond": 191957.00163163483,
+          "ledger": {
+            "retainedEntries": 1000,
+            "heapGrowthBytes": 2295768,
+            "leakedEntriesAfterBurst": 0
+          }
+        },
+        {
+          "size": 10000,
+          "recordEntriesPerSecond": 192367.99227450142,
+          "reconcileLatencyMs": {
+            "p50": 31.21010000000001,
+            "p90": 34.69010000000003,
+            "p99": 36.20740000000001,
+            "samples": 50
+          },
+          "reconcileBurstEntriesPerSecond": 177155.13652460542,
+          "ledger": {
+            "retainedEntries": 10000,
+            "heapGrowthBytes": 14071640,
+            "leakedEntriesAfterBurst": 0
+          }
+        }
+      ]
+    },
+    {
+      "language": "python",
+      "runtime": "3.13.14",
+      "measuredAt": "2026-08-08T15:33:58Z",
+      "sizes": [
+        {
+          "size": 100,
+          "recordEntriesPerSecond": 25239.140838853546,
+          "reconcileLatencyMs": {
+            "p50": 1.4266999933170155,
+            "p90": 1.9217999943066388,
+            "p99": 2.621399995405227,
+            "samples": 50
+          },
+          "reconcileBurstEntriesPerSecond": 37548.813548449456,
+          "ledger": {
+            "retainedEntries": 100,
+            "heapGrowthBytes": 62594,
+            "leakedEntriesAfterBurst": 0
+          }
+        },
+        {
+          "size": 1000,
+          "recordEntriesPerSecond": 31895.28141670317,
+          "reconcileLatencyMs": {
+            "p50": 18.893900007242337,
+            "p90": 20.496900004218332,
+            "p99": 23.965900007169694,
+            "samples": 50
+          },
+          "reconcileBurstEntriesPerSecond": 37771.19720585112,
+          "ledger": {
+            "retainedEntries": 1000,
+            "heapGrowthBytes": 608598,
+            "leakedEntriesAfterBurst": 0
+          }
+        },
+        {
+          "size": 10000,
+          "recordEntriesPerSecond": 29809.218024182403,
+          "reconcileLatencyMs": {
+            "p50": 184.59299999813084,
+            "p90": 198.06970001081936,
+            "p99": 235.02469999948516,
+            "samples": 50
+          },
+          "reconcileBurstEntriesPerSecond": 36178.97885545598,
+          "ledger": {
+            "retainedEntries": 10000,
+            "heapGrowthBytes": 5584598,
+            "leakedEntriesAfterBurst": 0
+          }
+        }
+      ]
+    }
+  ]
+}

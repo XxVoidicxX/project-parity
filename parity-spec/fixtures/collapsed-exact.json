@@ -1,0 +1,5 @@
+{
+  "clock": "2026-08-07T12:00:00.000Z",
+  "intents": [{"actionType":"MESSAGE_DELETE","targetId":"m1","targetType":"message","guildId":"guild-1","correlationId":"delete-1"},{"actionType":"MESSAGE_DELETE","targetId":"m2","targetType":"message","guildId":"guild-1","correlationId":"delete-2"}],
+  "events": [{"actionType":"MESSAGE_DELETE","targetId":"m1","targetType":"message","guildId":"guild-1","executorId":"bot-1","auditEntryId":"audit-burst","occurredAt":"2026-08-07T12:00:00.000Z","count":2}]
+}

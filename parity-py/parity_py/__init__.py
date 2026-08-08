@@ -9,6 +9,7 @@ def ms(value): return int(datetime.fromisoformat(value.replace('Z','+00:00')).ti
 class MemoryLedgerAdapter:
     def __init__(self): self.data={}
     async def insert(self,e): self.data[e['correlationId']]=dict(e)
+    async def has(self,k): return k in self.data
     async def all(self): return [dict(e) for e in self.data.values()]
     async def remove(self,k): self.data.pop(k,None)
 class SqliteLedgerAdapter:
@@ -16,13 +17,15 @@ class SqliteLedgerAdapter:
     async def insert(self,e): self.db.execute('INSERT OR REPLACE INTO parity_ledger VALUES (?,?)',(e['correlationId'],json.dumps(e))); self.db.commit()
     async def all(self): return [json.loads(x[0]) for x in self.db.execute('SELECT payload FROM parity_ledger')]
     async def remove(self,k): self.db.execute('DELETE FROM parity_ledger WHERE id=?',(k,)); self.db.commit()
+    def close(self): self.db.close()
 class Ledger:
     def __init__(self,adapter=None,ttl_ms=120000,clock=lambda: int(datetime.now().timestamp()*1000)): self.adapter=adapter or MemoryLedgerAdapter(); self.ttl_ms=ttl_ms; self.clock=clock
     async def record(self,i):
         action_type=str(i['actionType'])
         if action_type.startswith('UNKNOWN_'): raise ValueError('Unknown audit actions cannot be ledgered until they are mapped')
         correlation_id=str(i.get('correlationId') or uuid.uuid4())
-        if any(e['correlationId']==correlation_id for e in await self.entries()): raise ValueError(f'Duplicate correlationId: {correlation_id}')
+        duplicate=await self.adapter.has(correlation_id) if hasattr(self.adapter,'has') else any(e['correlationId']==correlation_id for e in await self.entries())
+        if duplicate: raise ValueError(f'Duplicate correlationId: {correlation_id}')
         t=iso(i.get('timestamp',self.clock())); e={'actionType':action_type,'targetId':str(i['targetId']),'targetType':str(i.get('targetType','unknown')),'guildId':str(i['guildId']),'timestamp':t,'correlationId':correlation_id,'expiresAt':iso(i.get('expiresAt',ms(t)+self.ttl_ms))};
         if 'metadata'in i:e['metadata']=i['metadata']
         await self.adapter.insert(e); return e

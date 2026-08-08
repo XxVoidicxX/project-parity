@@ -1,0 +1,41 @@
+#!/usr/bin/env node
+const { existsSync, readFileSync } = require('node:fs');
+const { resolve } = require('node:path');
+
+function loadDotEnv() {
+  const path = resolve(process.cwd(), '.env');
+  if (!existsSync(path)) return;
+  for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
+    const match = line.match(/^\s*DISCORD_BOT_TOKEN\s*=\s*(.*?)\s*$/);
+    if (match && !process.env.DISCORD_BOT_TOKEN) process.env.DISCORD_BOT_TOKEN = match[1].replace(/^['"]|['"]$/g, '');
+  }
+}
+function option(name) { const index = process.argv.indexOf(name); return index >= 0 ? process.argv[index + 1] : null; }
+
+(async () => {
+  loadDotEnv();
+  const token = process.env.DISCORD_BOT_TOKEN;
+  if (!token) { console.log('Live check skipped: set DISCORD_BOT_TOKEN to run live checks.'); process.exitCode = 0; return; }
+  const guildId = option('--guild-id');
+  const targetId = option('--target-id');
+  if (!guildId || !targetId) { console.log('Live check requires --guild-id and --target-id. No action was performed.'); process.exitCode = 0; return; }
+  const [{ Client, GatewayIntentBits }, { attach }] = await Promise.all([import('discord.js'), import('../parity-js/src/index.js')]);
+  const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildModeration] });
+  const reports = [];
+  const parity = attach(client, { strategies: [{ send: async report => reports.push(report) }] });
+  const timeout = setTimeout(() => finish('Timed out waiting for the manual CHANNEL_UPDATE audit event.'), 120000);
+  function finish(message) { clearTimeout(timeout); parity.detach(); client.destroy(); console.log(message); process.exitCode = reports.length ? 1 : 0; }
+  client.once('ready', async () => {
+    const subscribed = client.listenerCount('guildAuditLogEntryCreate') > 0 && client.options.intents.has(GatewayIntentBits.GuildModeration);
+    if (!subscribed) return finish('Live check could not subscribe to audit-log gateway events.');
+    await parity.intent({ actionType: 'CHANNEL_UPDATE', targetId, targetType: 'channel', guildId, correlationId: `live-${Date.now()}` });
+    console.log(`Connected as ${client.user.tag}. Audit listener is registered.`);
+    console.log('Now edit the topic of the specified disposable test channel once. The harness will verify that the self-action produces no drift.');
+  });
+  client.on('guildAuditLogEntryCreate', entry => {
+    if (String(entry.guild?.id ?? entry.guildId) !== String(guildId) || String(entry.targetId ?? entry.target?.id) !== String(targetId)) return;
+    setTimeout(() => finish(reports.length ? 'Live check observed drift. Inspect the report destination.' : 'Live check passed: observed self-action reconciled with no drift.'), 250);
+  });
+  client.on('error', error => finish(`Live check failed to connect: ${error.message}`));
+  await client.login(token);
+})().catch(error => { console.error(`Live check failed: ${error.message}`); process.exitCode = 1; });

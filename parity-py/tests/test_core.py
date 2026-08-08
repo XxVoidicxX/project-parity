@@ -85,6 +85,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await ledger.entries())[0]['correlationId'], 'intent-1')
         await ledger.remove('intent-1')
         self.assertEqual(await ledger.entries(), [])
+        adapter.close()
 
     async def test_adversarial_evasion_attempts_have_explicit_outcomes(self):
         ledger = Ledger(clock=lambda: NOW)
