@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 COLLAPSED = {'MEMBER_MOVE', 'MEMBER_DISCONNECT', 'MESSAGE_DELETE'}
 MAX_AUDIT_COUNT = 10000
-ACTIONS = {10:'CHANNEL_CREATE',11:'CHANNEL_UPDATE',12:'CHANNEL_DELETE',26:'MEMBER_MOVE',27:'MEMBER_DISCONNECT',72:'MESSAGE_DELETE',73:'MESSAGE_BULK_DELETE',1:'GUILD_UPDATE',20:'MEMBER_KICK',22:'MEMBER_BAN_ADD',30:'ROLE_CREATE',31:'ROLE_UPDATE',50:'WEBHOOK_CREATE',60:'EMOJI_CREATE',80:'INTEGRATION_CREATE',90:'STICKER_CREATE',100:'GUILD_SCHEDULED_EVENT_CREATE',110:'THREAD_CREATE',120:'APPLICATION_COMMAND_PERMISSION_UPDATE',140:'AUTO_MODERATION_RULE_CREATE'}
+ACTIONS = {1:'GUILD_UPDATE',10:'CHANNEL_CREATE',11:'CHANNEL_UPDATE',12:'CHANNEL_DELETE',13:'CHANNEL_OVERWRITE_CREATE',14:'CHANNEL_OVERWRITE_UPDATE',15:'CHANNEL_OVERWRITE_DELETE',20:'MEMBER_KICK',21:'MEMBER_PRUNE',22:'MEMBER_BAN_ADD',23:'MEMBER_BAN_REMOVE',24:'MEMBER_UPDATE',25:'MEMBER_ROLE_UPDATE',26:'MEMBER_MOVE',27:'MEMBER_DISCONNECT',28:'BOT_ADD',30:'ROLE_CREATE',31:'ROLE_UPDATE',32:'ROLE_DELETE',40:'INVITE_CREATE',41:'INVITE_UPDATE',42:'INVITE_DELETE',50:'WEBHOOK_CREATE',51:'WEBHOOK_UPDATE',52:'WEBHOOK_DELETE',60:'EMOJI_CREATE',61:'EMOJI_UPDATE',62:'EMOJI_DELETE',72:'MESSAGE_DELETE',73:'MESSAGE_BULK_DELETE',74:'MESSAGE_PIN',75:'MESSAGE_UNPIN',80:'INTEGRATION_CREATE',81:'INTEGRATION_UPDATE',82:'INTEGRATION_DELETE',83:'STAGE_INSTANCE_CREATE',84:'STAGE_INSTANCE_UPDATE',85:'STAGE_INSTANCE_DELETE',90:'STICKER_CREATE',91:'STICKER_UPDATE',92:'STICKER_DELETE',100:'GUILD_SCHEDULED_EVENT_CREATE',101:'GUILD_SCHEDULED_EVENT_UPDATE',102:'GUILD_SCHEDULED_EVENT_DELETE',110:'THREAD_CREATE',111:'THREAD_UPDATE',112:'THREAD_DELETE',120:'APPLICATION_COMMAND_PERMISSION_UPDATE',140:'AUTO_MODERATION_RULE_CREATE',141:'AUTO_MODERATION_RULE_UPDATE',142:'AUTO_MODERATION_RULE_DELETE',143:'AUTO_MODERATION_BLOCK_MESSAGE',144:'AUTO_MODERATION_FLAG_TO_CHANNEL',145:'AUTO_MODERATION_USER_COMMUNICATION_DISABLED'}
 REMEDIATION = ['Immediately rotate the bot token.', 'Inspect running bot instances and deployment credentials.', 'Preserve this report and relevant Discord audit logs for investigation.']
 
 def iso(value):
@@ -130,9 +130,66 @@ class AuditListener:
         if report: await self.dispatcher.dispatch(report)
         return report
 
+def _discord_py_entry_to_dict(entry):
+    extra = getattr(entry, 'extra', None) or {}
+    channel = getattr(extra, 'channel', None)
+    count = getattr(extra, 'count', None) or 1
+    target = getattr(entry, 'target', None)
+    user = getattr(entry, 'user', None)
+    guild = getattr(entry, 'guild', None)
+    return {
+        'id': str(entry.id),
+        'action': entry.action.value if hasattr(entry.action, 'value') else int(entry.action),
+        'targetId': str(target.id) if target else 'unknown',
+        'targetType': type(target).__name__.lower() if target else 'unknown',
+        'guildId': str(guild.id) if guild else '',
+        'executorId': str(user.id) if user else '',
+        'createdTimestamp': int(entry.created_at.timestamp() * 1000),
+        'count': count,
+        'extra': {'channel': {'id': str(channel.id)}} if channel else {},
+    }
+
 async def attach(client, **options):
     clock = options.get('clock', lambda: int(datetime.now().timestamp() * 1000))
     ledger = options.get('ledger', Ledger(clock=clock))
     dispatcher = options.get('dispatcher', AlertDispatcher())
     reconciler = options.get('reconciler', Reconciler(ledger, clock=clock))
-    return {'ledger': ledger, 'reconciler': reconciler, 'dispatcher': dispatcher, 'listener': AuditListener(client, reconciler, dispatcher, options.get('bot_user_id', lambda: getattr(client.user, 'id', None))), 'intent': ledger.record}
+    bot_user_id = options.get('bot_user_id', lambda: getattr(client.user if client else None, 'id', None))
+    listener = AuditListener(client, reconciler, dispatcher, bot_user_id)
+
+    # Auto-register against discord.py / py-cord clients that support add_listener.
+    # The handlers convert discord.py AuditLogEntry objects to the dict format normalize_audit expects.
+    if client is not None and callable(getattr(client, 'add_listener', None)):
+        async def _audit_handler(entry):
+            await listener.handle_audit(_discord_py_entry_to_dict(entry))
+        async def _message_handler(message):
+            author = getattr(message, 'author', None)
+            guild = getattr(message, 'guild', None)
+            if author is None or guild is None:
+                return
+            await listener.handle_message({
+                'id': str(message.id),
+                'guildId': str(guild.id),
+                'author': {'id': str(author.id)},
+                'createdTimestamp': int(message.created_at.timestamp() * 1000),
+            })
+        client.add_listener(_audit_handler, 'on_audit_log_entry_create')
+        client.add_listener(_message_handler, 'on_message')
+        listener._registered_audit_handler = _audit_handler
+        listener._registered_message_handler = _message_handler
+
+    async def detach():
+        if client is not None and callable(getattr(client, 'remove_listener', None)):
+            if hasattr(listener, '_registered_audit_handler'):
+                client.remove_listener(listener._registered_audit_handler, 'on_audit_log_entry_create')
+            if hasattr(listener, '_registered_message_handler'):
+                client.remove_listener(listener._registered_message_handler, 'on_message')
+
+    return {
+        'ledger': ledger,
+        'reconciler': reconciler,
+        'dispatcher': dispatcher,
+        'listener': listener,
+        'intent': ledger.record,
+        'detach': detach,
+    }
