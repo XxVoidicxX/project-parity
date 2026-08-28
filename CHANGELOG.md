@@ -4,6 +4,23 @@ All notable changes to this project are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows [Semantic Versioning](https://semver.org/).
 
+## [1.0.2] - 2026-08-27
+
+### Fixed
+
+- Corrected the canonical Discord action map: application-command permissions use code 121 (not 120), and current soundboard, quarantine, monetization, onboarding, home-settings, and voice-status actions are included. A test now compares the spec map with the installed discord.js enum, with the documented code-192 naming exception.
+- JavaScript auto-wrap now recognizes discord.js's real `RoleManager`, removes pre-call intents when REST operations fail, and records create targets from returned Discord objects.
+- Result-derived `track()` in both languages now registers an in-flight operation before the API call. Gateway listeners wait only for active generated-ID operations (bounded to five seconds), closing the create/message race confirmed by live tests.
+- Python `attach()` now works with plain `discord.Client` by composing and restoring `on_*` handlers, while also supporting listener-based clients. It registers discord.py and py-cord audit event variants and deduplicates duplicate audit IDs.
+- Python audit normalization now handles raw py-cord entries, derives timestamps from audit snowflakes, converts string counts, and uses canonical target types instead of cache-dependent class names.
+- The Python example now uses `intents.moderation` and the public `attach()` path; its prior `guild_audit_log` property and unreachable self-message branch were invalid.
+- The live JavaScript harness now isolates reports by action, target, and start index; waits for setup events; exits nonzero on failed assertions; and detaches before cleanup. Prior 1.0.1 results contained false passes/failures from loose matching.
+
+### Added
+
+- Unit coverage for JS auto-wrap, failed-operation cleanup, generated-ID races, Python registration/detach, plain-client handler composition, and action-map/runtime consistency.
+- A disposable-resource Python live harness (`tools/live-python-test.py`). On 2026-08-27 the corrected JS matrix passed 14/14 and the isolated discord.py 2.5.2 matrix passed 5/5 against VSH Codebase; all temporary resources were removed.
+
 ## [1.0.1] - 2026-08-08
 
 ### Fixed

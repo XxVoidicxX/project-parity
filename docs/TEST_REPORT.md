@@ -1,6 +1,6 @@
 # Project Parity test report
 
-**Version reported: 1.0.0**
+**Version reported: 1.0.2**
 
 This release pass exercised both implementations beyond their basic contract cases. The focus was matching at timing boundaries, malformed or unmatched self-actions, collapsed audit bursts, retention behavior, and serialized reconciliation under concurrent calls. The random scenarios use fixed seeds and injected clocks, so a failure should be reproducible rather than dependent on wall-clock timing.
 
@@ -8,13 +8,13 @@ This release pass exercised both implementations beyond their basic contract cas
 
 | Suite | Scope | Count | Result |
 | --- | --- | ---: | --- |
-| Root specification tests | JSON schemas and documented rules | 3 | Pass |
-| Cross-language driver | 7 shared fixtures with byte-identical reports | 1 | Pass |
-| JavaScript unit and stress tests | Core behavior, seeded fuzzing, 10,000-entry burst, 1,000 concurrent reconciliations | 15 | Pass |
-| Python unit and stress tests | Matching parity, seeded fuzzing, 10,000-entry burst, 1,000 concurrent reconciliations | 13 | Pass |
-| Live harness without token | Safe skip behavior | 1 manual command | Pass |
+| Root specification and cross-language tests | Schemas, rules, 8 byte-identical fixtures, generated maps, discord.js enum | 6 | Pass |
+| JavaScript unit and stress tests | Core behavior, attach/track/auto-wrap, seeded fuzzing, 10,000-entry burst, 1,000 concurrent reconciliations | 21 | Pass |
+| Python unit and stress tests | Core behavior, both registration paths, target types, generated-ID race, fuzzing and stress | 17 | Pass |
+| JavaScript live matrix | Disposable channels, roles, webhook, self-messages, manual and wrapped reconciliation | 14 | Pass |
+| Python live matrix | Isolated discord.py 2.5.2, disposable channel and self-messages | 5 | Pass |
 
-The JavaScript root run completed with 19 passing test cases across the specification, cross-language, and package suites. The Python run completed with 13 passing test cases.
+The root `npm test` command now runs all 27 JavaScript/spec/cross-language checks plus all 17 Python checks, so Python regressions can no longer be skipped by the default command.
 
 ## Benchmark method
 
@@ -48,7 +48,7 @@ The raw, machine-readable measurements are retained in [`benchmarks/results.json
 
 ## What we could not test
 
-No real Discord tenant or token was used during this pass. We could not measure real audit-log gateway delivery latency, permission failures, Discord-side event collapse frequency, reconnect behavior, or rate-limit behavior. The live harness is intentionally operator-driven and needs a dedicated guild and disposable channel to validate that path.
+The 2026-08-27 pass used a real Discord tenant and disposable resources. It verified live gateway delivery, permission checks, channel/role/webhook normalization, manual intents, auto-wrap, and generated message IDs. It did not force Discord-side collapsed bursts, reconnect/outage recovery, rate limits, member moderation, or every mapped action type. Local time differed from Discord snowflake timestamps by roughly half a second during the JS run, so those deltas are not treated as delivery-latency measurements.
 
 The stress tests use the in-memory ledger. They verify entry cleanup and reconciliation correctness, but they do not establish SQLite throughput, process memory ceilings, multi-process writer behavior, or a production retention policy. The benchmark memory figures are not a substitute for heap profiling under a deployed bot workload.
 
@@ -58,14 +58,27 @@ From the repository root in PowerShell:
 
 ```powershell
 npm test
-Set-Location parity-py
-python -m unittest discover -s tests
-Set-Location ..
 npm run benchmark
-node tools/live-parity-check
+npm run live-test
+npm run live-test:py
 ```
 
-The last command skips successfully when `DISCORD_BOT_TOKEN` is absent. For an operator-run tenant check, follow [setup instructions](setup.md#live-discord-check), rotate the token first, set it only in the environment or ignored `.env`, and provide the required guild and test-channel identifiers.
+The live commands skip successfully when credentials are absent. For an operator-run tenant check, use an isolated Python environment containing only `discord.py` (not py-cord in the same environment), follow [setup instructions](setup.md#live-discord-check), set the token only in the environment or ignored `.env`, and provide `PARITY_GUILD_ID`.
+
+---
+
+## Version 1.0.2 live verification and race fixes
+
+The original comprehensive harness reported 7/9, but two assertions were invalid: one searched for mixed-case `Update` inside canonical `CHANNEL_UPDATE`, and another accepted `ROLE_CREATE` as proof of a role-update drift. After exact action/target/start-index isolation, the first corrected run exposed real generated-ID races and a wrong `GuildRoleManager` class-name assumption. The in-flight operation handshake and `RoleManager` correction were then implemented and tested.
+
+- JavaScript live matrix: **14/14 pass** on discord.js 14.27.0.
+- Python live matrix: **5/5 pass** in an isolated discord.py 2.5.2 environment.
+- Live-confirmed drift: unrecorded channel create/update, role update, webhook create, and guild self-message.
+- Live-confirmed clean reconciliation: manual channel/role updates, auto-wrapped channel/role creates and updates, and result-derived tracked messages.
+- Cleanup: all temporary `parity-test-*` and `parity-py-test-*` channels, roles, and webhooks were deleted.
+- Environment finding: the host's global Python environment contained both discord.py and py-cord in the same `discord` namespace; it was rejected as an integration-test environment rather than used as evidence.
+
+The canonical action map was also corrected against Discord's current audit-log table and discord.js 14.27.0. Code 192 remains named `VOICE_CHANNEL_STATUS_UPDATE` per Discord's official documentation even though discord.js 14.27.0 exposes the legacy/mismatched enum name `VoiceChannelStatusCreate`.
 
 ---
 

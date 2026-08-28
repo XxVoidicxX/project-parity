@@ -57,7 +57,7 @@ async function kickMember(guild, memberId, reason) {
   await parity.intent({
     actionType: 'MEMBER_KICK',
     targetId: memberId,
-    targetType: 'member',
+    targetType: 'user',
     guildId: guild.id,
   });
 
@@ -100,7 +100,7 @@ client.on(Events.MessageCreate, async message => {
 
   if (sub === 'status') {
     await message.reply(
-      `Parity v1.0.1 is active.\n` +
+      `Parity v1.0.2 is active.\n` +
       `Monitoring guild ${message.guild.name}.\n` +
       `Alert channel: ${alertChannelId ? `<#${alertChannelId}>` : 'not configured'}`
     );

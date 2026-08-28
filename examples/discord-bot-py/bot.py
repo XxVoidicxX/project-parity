@@ -8,8 +8,8 @@ Install:
 Run:
     python bot.py
 
-The bot needs these intents enabled in the Discord Developer Portal:
-  - GUILD_AUDIT_LOG (under Privileged Gateway Intents)
+The bot needs these gateway intents:
+  - moderation (discord.py's name for GUILD_MODERATION / audit-log delivery)
   - MESSAGE_CONTENT (if you want the !parity commands to work)
 """
 
@@ -24,7 +24,7 @@ sys.path.insert(0, str(REPO_ROOT / 'parity-py'))
 
 import discord
 from dotenv import load_dotenv
-from parity_py import Ledger, Reconciler, AlertDispatcher, AuditListener
+from parity_py import attach, AlertDispatcher
 
 load_dotenv()
 
@@ -61,53 +61,25 @@ class ParityStrategy:
 class ParityBot(discord.Client):
     def __init__(self):
         intents = discord.Intents.default()
-        intents.guild_audit_log = True
+        intents.moderation = True
         intents.message_content = True
         super().__init__(intents=intents)
 
-        self.ledger = Ledger()
         self.dispatcher = AlertDispatcher(strategies=[])
-        self.reconciler = Reconciler(self.ledger)
-        self.parity_listener = None
+        self.parity = None
 
     async def setup_hook(self):
         strategy = ParityStrategy(self)
         self.dispatcher = AlertDispatcher(strategies=[strategy])
-        self.reconciler = Reconciler(self.ledger)
-        self.parity_listener = AuditListener(
-            client=self,
-            reconciler=self.reconciler,
-            dispatcher=self.dispatcher,
-            bot_user_id=lambda: self.user.id if self.user else None,
-        )
+        self.parity = await attach(self, dispatcher=self.dispatcher)
 
     async def on_ready(self):
         print(f'Logged in as {self.user} (id={self.user.id})')
         print('Parity drift detection is active.')
 
-    async def on_audit_log_entry_create(self, entry: discord.AuditLogEntry):
-        raw = {
-            'id': str(entry.id),
-            'action': entry.action.value,
-            'targetId': str(entry.target.id) if entry.target else 'unknown',
-            'targetType': type(entry.target).__name__.lower() if entry.target else 'unknown',
-            'guildId': str(entry.guild.id),
-            'executorId': str(entry.user.id) if entry.user else '',
-            'createdTimestamp': int(entry.created_at.timestamp() * 1000),
-            'count': getattr(entry.extra, 'count', 1) or 1,
-        }
-        await self.parity_listener.handle_audit(raw)
-
     async def on_message(self, message: discord.Message):
         if message.author.bot or not message.guild:
             return
-        if message.author == self.user:
-            await self.parity_listener.handle_message({
-                'id': str(message.id),
-                'guildId': str(message.guild.id),
-                'author': {'id': str(message.author.id)},
-                'createdTimestamp': int(message.created_at.timestamp() * 1000),
-            })
         if not message.content.startswith('!parity'):
             return
 
@@ -116,7 +88,7 @@ class ParityBot(discord.Client):
 
         if sub == 'status':
             await message.reply(
-                f'Parity v1.0.1 is active.\n'
+                f'Parity v1.0.2 is active.\n'
                 f'Monitoring guild {message.guild.name}.\n'
                 f'Alert channel: {f"<#{ALERT_CHANNEL_ID}>" if ALERT_CHANNEL_ID else "not configured"}'
             )
@@ -134,7 +106,7 @@ class ParityBot(discord.Client):
         await message.reply('Commands: `!parity status` | `!parity settopic <text>`')
 
     async def set_channel_topic(self, channel: discord.TextChannel, topic: str):
-        await self.ledger.record({
+        await self.parity['intent']({
             'actionType': 'CHANNEL_UPDATE',
             'targetId': str(channel.id),
             'targetType': 'channel',
@@ -143,16 +115,16 @@ class ParityBot(discord.Client):
         await channel.edit(topic=topic)
 
     async def kick_member(self, guild: discord.Guild, member_id: int, reason: str = ''):
-        await self.ledger.record({
+        await self.parity['intent']({
             'actionType': 'MEMBER_KICK',
             'targetId': str(member_id),
-            'targetType': 'member',
+            'targetType': 'user',
             'guildId': str(guild.id),
         })
         await guild.kick(discord.Object(id=member_id), reason=reason)
 
     async def ban_member(self, guild: discord.Guild, member_id: int, reason: str = ''):
-        await self.ledger.record({
+        await self.parity['intent']({
             'actionType': 'MEMBER_BAN_ADD',
             'targetId': str(member_id),
             'targetType': 'user',

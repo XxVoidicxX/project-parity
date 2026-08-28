@@ -1,7 +1,8 @@
 import asyncio
 import unittest
+from datetime import datetime, timezone
 
-from parity_py import AlertDispatcher, AuditListener, Ledger, Reconciler, SqliteLedgerAdapter
+from parity_py import attach, AlertDispatcher, AuditListener, Ledger, Reconciler, SqliteLedgerAdapter, _target_type_for_action
 
 NOW = 1786104000000
 
@@ -16,6 +17,90 @@ class Collector:
     async def send(self, report): self.reports.append(report)
 
 class Tests(unittest.IsolatedAsyncioTestCase):
+    def test_action_derived_target_types_match_discord_js(self):
+        expected = {
+            'CHANNEL_OVERWRITE_UPDATE': 'channel',
+            'MEMBER_KICK': 'user',
+            'APPLICATION_COMMAND_PERMISSION_UPDATE': 'applicationcommand',
+            'AUTO_MODERATION_RULE_UPDATE': 'automoderation',
+            'ONBOARDING_PROMPT_UPDATE': 'guildonboardingprompt',
+            'ONBOARDING_UPDATE': 'guildonboarding',
+        }
+        self.assertEqual({action: _target_type_for_action(action) for action in expected}, expected)
+
+    async def test_attach_registers_live_handlers_detaches_and_tracks_safely(self):
+        class Client:
+            def __init__(self):
+                self.user = type('User', (), {'id': 'bot'})()
+                self.listeners = {}
+            def add_listener(self, handler, name): self.listeners[name] = handler
+            def remove_listener(self, handler, name):
+                if self.listeners.get(name) is handler: self.listeners.pop(name)
+
+        reports = []
+        client = Client()
+        parity = await attach(client, clock=lambda: NOW, strategies=[Collector(reports)])
+        self.assertEqual(set(client.listeners), {'on_audit_log_entry_create', 'on_audit_log_entry', 'on_raw_audit_log_entry', 'on_message'})
+        await parity['intent'](intent())
+        action = type('Action', (), {'value': 10})()
+        actor = type('User', (), {'id': 'bot'})()
+        guild = type('Guild', (), {'id': 'guild'})()
+        entry = type('Entry', (), {'id': 'audit', 'action': action, 'target': type('Channel', (), {'id': 'target'})(), 'user': actor, 'user_id': 'bot', 'guild': guild, 'created_at': datetime.fromtimestamp(NOW / 1000, timezone.utc), 'extra': None})()
+        await client.listeners['on_audit_log_entry_create'](entry)
+        self.assertEqual(await parity['ledger'].entries(), [])
+        message = type('Message', (), {'id': 'rogue-message', 'author': actor, 'guild': guild, 'created_at': datetime.fromtimestamp(NOW / 1000, timezone.utc)})()
+        await client.listeners['on_message'](message)
+        self.assertEqual(reports[0]['event']['actionType'], 'MESSAGE_CREATE')
+
+        async def rejected(): raise RuntimeError('REST rejected')
+        with self.assertRaisesRegex(RuntimeError, 'REST rejected'):
+            await parity['track'](intent(correlationId='failed-track'), rejected)
+        self.assertEqual(await parity['ledger'].entries(), [])
+        result = await parity['track'](lambda resource: intent(targetId=resource['id'], correlationId='generated-target'), lambda: {'id': 'discord-id'})
+        self.assertEqual(result['id'], 'discord-id')
+        self.assertEqual((await parity['ledger'].entries())[0]['targetId'], 'discord-id')
+        await parity['ledger'].remove('generated-target')
+
+        gate = asyncio.Event()
+        async def generated_message():
+            await gate.wait()
+            return {'id': 'tracked-message'}
+        tracked = asyncio.create_task(parity['track'](
+            lambda resource: {'actionType': 'MESSAGE_CREATE', 'targetId': resource['id'], 'targetType': 'message', 'guildId': 'guild', 'correlationId': 'tracked-message'},
+            generated_message,
+        ))
+        await asyncio.sleep(0)
+        tracked_message = type('Message', (), {'id': 'tracked-message', 'author': actor, 'guild': guild, 'created_at': datetime.fromtimestamp(NOW / 1000, timezone.utc)})()
+        gateway = asyncio.create_task(client.listeners['on_message'](tracked_message))
+        gate.set()
+        await asyncio.gather(tracked, gateway)
+        self.assertEqual(len(reports), 1)
+        self.assertEqual(await parity['ledger'].entries(), [])
+        await parity['detach']()
+        self.assertEqual(client.listeners, {})
+
+    async def test_attach_composes_plain_discord_client_handlers_without_add_listener(self):
+        calls = []
+        class PlainClient:
+            def __init__(self): self.user = type('User', (), {'id': 'bot'})()
+            async def on_message(self, message): calls.append(('host', message.id))
+
+        client = PlainClient()
+        original = client.on_message
+        reports = []
+        parity = await attach(client, clock=lambda: NOW, strategies=[Collector(reports)])
+        self.assertIsNot(client.on_message, original)
+        message = type('Message', (), {
+            'id': 'rogue', 'author': type('User', (), {'id': 'bot'})(),
+            'guild': type('Guild', (), {'id': 'guild'})(),
+            'created_at': datetime.fromtimestamp(NOW / 1000, timezone.utc),
+        })()
+        await client.on_message(message)
+        self.assertEqual(calls, [('host', 'rogue')])
+        self.assertEqual(reports[0]['event']['actionType'], 'MESSAGE_CREATE')
+        await parity['detach']()
+        self.assertEqual(client.on_message, original)
+
     async def test_ledger_writes_canonical_entry_and_purge_timing_edges(self):
         ledger = Ledger(clock=lambda: NOW)
         entry = await ledger.record(intent(correlationId='generated'))
@@ -53,7 +138,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((report['kind'], report['event']['count']), ('drift', 2))
 
     async def test_representative_action_coverage_reconciles_exactly(self):
-        actions = ['GUILD_UPDATE','CHANNEL_DELETE','CHANNEL_OVERWRITE_UPDATE','MEMBER_KICK','MEMBER_BAN_ADD','ROLE_UPDATE','INVITE_DELETE','WEBHOOK_CREATE','EMOJI_DELETE','STICKER_UPDATE','INTEGRATION_DELETE','STAGE_INSTANCE_CREATE','GUILD_SCHEDULED_EVENT_UPDATE','THREAD_DELETE','APPLICATION_COMMAND_PERMISSION_UPDATE','AUTO_MODERATION_RULE_CREATE','ONBOARDING_UPDATE','VOICE_CHANNEL_STATUS_UPDATE','GUILD_SOUNDBOARD_SOUND_CREATE','GUILD_EXPRESSION_DELETE','MESSAGE_PIN']
+        actions = ['GUILD_UPDATE','CHANNEL_DELETE','CHANNEL_OVERWRITE_UPDATE','MEMBER_KICK','MEMBER_BAN_ADD','ROLE_UPDATE','INVITE_DELETE','WEBHOOK_CREATE','EMOJI_DELETE','STICKER_UPDATE','INTEGRATION_DELETE','STAGE_INSTANCE_CREATE','GUILD_SCHEDULED_EVENT_UPDATE','THREAD_DELETE','APPLICATION_COMMAND_PERMISSION_UPDATE','AUTO_MODERATION_RULE_CREATE','AUTO_MODERATION_QUARANTINE_USER','ONBOARDING_UPDATE','VOICE_CHANNEL_STATUS_UPDATE','SOUNDBOARD_SOUND_CREATE','MESSAGE_PIN']
         for action_type in actions:
             ledger = Ledger(clock=lambda: NOW)
             await ledger.record(intent(actionType=action_type, correlationId=action_type))
@@ -64,7 +149,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         listener = AuditListener(None, Reconciler(Ledger(clock=lambda: NOW), clock=lambda: NOW), AlertDispatcher([Collector(reports)]), lambda: 'bot')
         await listener.reconciler.ledger.record(intent())
         self.assertIsNone(await listener.handle_audit(event(actionType=10, targetType='channel')))
-        await listener.handle_audit(event(actionType=10, targetId='rogue', targetType='channel'))
+        await listener.handle_audit(event(actionType=10, targetId='rogue', targetType='channel', auditEntryId='audit-rogue'))
         await listener.handle_message({'id':'message-rogue','guildId':'guild','author':{'id':'bot'},'createdTimestamp':NOW})
         self.assertEqual(len(reports), 2)
         self.assertEqual(reports[0]['event']['targetId'], 'rogue')

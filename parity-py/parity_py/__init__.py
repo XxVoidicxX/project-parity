@@ -1,5 +1,6 @@
 ﻿import asyncio
 import copy
+import inspect
 import json
 import sqlite3
 import uuid
@@ -7,7 +8,7 @@ from datetime import datetime, timezone
 
 COLLAPSED = {'MEMBER_MOVE', 'MEMBER_DISCONNECT', 'MESSAGE_DELETE'}
 MAX_AUDIT_COUNT = 10000
-ACTIONS = {1:'GUILD_UPDATE',10:'CHANNEL_CREATE',11:'CHANNEL_UPDATE',12:'CHANNEL_DELETE',13:'CHANNEL_OVERWRITE_CREATE',14:'CHANNEL_OVERWRITE_UPDATE',15:'CHANNEL_OVERWRITE_DELETE',20:'MEMBER_KICK',21:'MEMBER_PRUNE',22:'MEMBER_BAN_ADD',23:'MEMBER_BAN_REMOVE',24:'MEMBER_UPDATE',25:'MEMBER_ROLE_UPDATE',26:'MEMBER_MOVE',27:'MEMBER_DISCONNECT',28:'BOT_ADD',30:'ROLE_CREATE',31:'ROLE_UPDATE',32:'ROLE_DELETE',40:'INVITE_CREATE',41:'INVITE_UPDATE',42:'INVITE_DELETE',50:'WEBHOOK_CREATE',51:'WEBHOOK_UPDATE',52:'WEBHOOK_DELETE',60:'EMOJI_CREATE',61:'EMOJI_UPDATE',62:'EMOJI_DELETE',72:'MESSAGE_DELETE',73:'MESSAGE_BULK_DELETE',74:'MESSAGE_PIN',75:'MESSAGE_UNPIN',80:'INTEGRATION_CREATE',81:'INTEGRATION_UPDATE',82:'INTEGRATION_DELETE',83:'STAGE_INSTANCE_CREATE',84:'STAGE_INSTANCE_UPDATE',85:'STAGE_INSTANCE_DELETE',90:'STICKER_CREATE',91:'STICKER_UPDATE',92:'STICKER_DELETE',100:'GUILD_SCHEDULED_EVENT_CREATE',101:'GUILD_SCHEDULED_EVENT_UPDATE',102:'GUILD_SCHEDULED_EVENT_DELETE',110:'THREAD_CREATE',111:'THREAD_UPDATE',112:'THREAD_DELETE',120:'APPLICATION_COMMAND_PERMISSION_UPDATE',140:'AUTO_MODERATION_RULE_CREATE',141:'AUTO_MODERATION_RULE_UPDATE',142:'AUTO_MODERATION_RULE_DELETE',143:'AUTO_MODERATION_BLOCK_MESSAGE',144:'AUTO_MODERATION_FLAG_TO_CHANNEL',145:'AUTO_MODERATION_USER_COMMUNICATION_DISABLED'}
+ACTIONS = {1:'GUILD_UPDATE',10:'CHANNEL_CREATE',11:'CHANNEL_UPDATE',12:'CHANNEL_DELETE',13:'CHANNEL_OVERWRITE_CREATE',14:'CHANNEL_OVERWRITE_UPDATE',15:'CHANNEL_OVERWRITE_DELETE',20:'MEMBER_KICK',21:'MEMBER_PRUNE',22:'MEMBER_BAN_ADD',23:'MEMBER_BAN_REMOVE',24:'MEMBER_UPDATE',25:'MEMBER_ROLE_UPDATE',26:'MEMBER_MOVE',27:'MEMBER_DISCONNECT',28:'BOT_ADD',30:'ROLE_CREATE',31:'ROLE_UPDATE',32:'ROLE_DELETE',40:'INVITE_CREATE',41:'INVITE_UPDATE',42:'INVITE_DELETE',50:'WEBHOOK_CREATE',51:'WEBHOOK_UPDATE',52:'WEBHOOK_DELETE',60:'EMOJI_CREATE',61:'EMOJI_UPDATE',62:'EMOJI_DELETE',72:'MESSAGE_DELETE',73:'MESSAGE_BULK_DELETE',74:'MESSAGE_PIN',75:'MESSAGE_UNPIN',80:'INTEGRATION_CREATE',81:'INTEGRATION_UPDATE',82:'INTEGRATION_DELETE',83:'STAGE_INSTANCE_CREATE',84:'STAGE_INSTANCE_UPDATE',85:'STAGE_INSTANCE_DELETE',90:'STICKER_CREATE',91:'STICKER_UPDATE',92:'STICKER_DELETE',100:'GUILD_SCHEDULED_EVENT_CREATE',101:'GUILD_SCHEDULED_EVENT_UPDATE',102:'GUILD_SCHEDULED_EVENT_DELETE',110:'THREAD_CREATE',111:'THREAD_UPDATE',112:'THREAD_DELETE',121:'APPLICATION_COMMAND_PERMISSION_UPDATE',130:'SOUNDBOARD_SOUND_CREATE',131:'SOUNDBOARD_SOUND_UPDATE',132:'SOUNDBOARD_SOUND_DELETE',140:'AUTO_MODERATION_RULE_CREATE',141:'AUTO_MODERATION_RULE_UPDATE',142:'AUTO_MODERATION_RULE_DELETE',143:'AUTO_MODERATION_BLOCK_MESSAGE',144:'AUTO_MODERATION_FLAG_TO_CHANNEL',145:'AUTO_MODERATION_USER_COMMUNICATION_DISABLED',146:'AUTO_MODERATION_QUARANTINE_USER',150:'CREATOR_MONETIZATION_REQUEST_CREATED',151:'CREATOR_MONETIZATION_TERMS_ACCEPTED',163:'ONBOARDING_PROMPT_CREATE',164:'ONBOARDING_PROMPT_UPDATE',165:'ONBOARDING_PROMPT_DELETE',166:'ONBOARDING_CREATE',167:'ONBOARDING_UPDATE',190:'HOME_SETTINGS_CREATE',191:'HOME_SETTINGS_UPDATE',192:'VOICE_CHANNEL_STATUS_UPDATE',193:'VOICE_CHANNEL_STATUS_DELETE'}
 REMEDIATION = ['Immediately rotate the bot token.', 'Inspect running bot instances and deployment credentials.', 'Preserve this report and relevant Discord audit logs for investigation.']
 
 def iso(value):
@@ -105,10 +106,20 @@ class AlertDispatcher:
     async def dispatch(self, report): await asyncio.gather(*(strategy.send(report) for strategy in self.strategies))
 
 class AuditListener:
-    def __init__(self, client, reconciler, dispatcher, bot_user_id): self.client, self.reconciler, self.dispatcher, self.bot_user_id = client, reconciler, dispatcher, bot_user_id
+    def __init__(self, client, reconciler, dispatcher, bot_user_id, wait_for_pending=None, clock=lambda: int(datetime.now().timestamp() * 1000), dedupe_ttl_ms=600000):
+        self.client, self.reconciler, self.dispatcher, self.bot_user_id = client, reconciler, dispatcher, bot_user_id
+        self.wait_for_pending, self.clock, self.dedupe_ttl_ms, self.seen = wait_for_pending or (lambda: asyncio.sleep(0)), clock, dedupe_ttl_ms, {}
+    def duplicate(self, audit_id):
+        if audit_id is None: return False
+        now = self.clock()
+        self.seen = {key: seen_at for key, seen_at in self.seen.items() if seen_at + self.dedupe_ttl_ms >= now}
+        if audit_id in self.seen: return True
+        self.seen[audit_id] = now
+        return False
     async def handle_audit(self, entry):
         event = self.normalize_audit(entry)
-        if event['executorId'] != str(self.bot_user_id()): return None
+        if event['executorId'] != str(self.bot_user_id()) or self.duplicate(event['auditEntryId']): return None
+        await self.wait_for_pending()
         report = await self.reconciler.reconcile(event)
         if report: await self.dispatcher.dispatch(report)
         return report
@@ -126,6 +137,7 @@ class AuditListener:
         author = message.get('author', {})
         if str(author.get('id')) != str(self.bot_user_id()) or not message.get('guildId'): return None
         event = {'actionType': 'MESSAGE_CREATE', 'targetId': str(message['id']), 'targetType': 'message', 'guildId': str(message['guildId']), 'executorId': str(author['id']), 'auditEntryId': None, 'occurredAt': iso(message.get('createdTimestamp', 0)), 'count': 1}
+        await self.wait_for_pending()
         report = await self.reconciler.reconcile(event)
         if report: await self.dispatcher.dispatch(report)
         return report
@@ -137,31 +149,83 @@ def _discord_py_entry_to_dict(entry):
     target = getattr(entry, 'target', None)
     user = getattr(entry, 'user', None)
     guild = getattr(entry, 'guild', None)
+    action = entry.action.value if hasattr(entry.action, 'value') else int(entry.action)
+    action_type = ACTIONS.get(action, f'UNKNOWN_{action}')
     return {
         'id': str(entry.id),
-        'action': entry.action.value if hasattr(entry.action, 'value') else int(entry.action),
+        'action': action,
         'targetId': str(target.id) if target else 'unknown',
-        'targetType': type(target).__name__.lower() if target else 'unknown',
+        'targetType': 'channel' if action_type in {'MEMBER_MOVE', 'MEMBER_DISCONNECT'} else _target_type_for_action(action_type),
         'guildId': str(guild.id) if guild else '',
-        'executorId': str(user.id) if user else '',
+        'executorId': str(user.id) if user else str(getattr(entry, 'user_id', '') or ''),
         'createdTimestamp': int(entry.created_at.timestamp() * 1000),
         'count': count,
         'extra': {'channel': {'id': str(channel.id)}} if channel else {},
     }
 
+def _target_type_for_action(action_type):
+    if action_type == 'GUILD_UPDATE': return 'guild'
+    if action_type.startswith('CHANNEL_') or action_type.startswith('VOICE_CHANNEL_STATUS_'): return 'channel'
+    if action_type.startswith('ROLE_'): return 'role'
+    if action_type.startswith('INVITE_'): return 'invite'
+    if action_type.startswith('WEBHOOK_'): return 'webhook'
+    if action_type.startswith('EMOJI_'): return 'emoji'
+    if action_type.startswith('STICKER_'): return 'sticker'
+    if action_type.startswith('INTEGRATION_'): return 'integration'
+    if action_type.startswith('STAGE_INSTANCE_'): return 'stageinstance'
+    if action_type.startswith('GUILD_SCHEDULED_EVENT_'): return 'guildscheduledevent'
+    if action_type.startswith('THREAD_'): return 'thread'
+    if action_type.startswith('SOUNDBOARD_SOUND_'): return 'soundboardsound'
+    if action_type == 'APPLICATION_COMMAND_PERMISSION_UPDATE': return 'applicationcommand'
+    if action_type.startswith('AUTO_MODERATION_RULE_'): return 'automoderation'
+    if action_type.startswith('ONBOARDING_PROMPT_'): return 'guildonboardingprompt'
+    if action_type.startswith('ONBOARDING_'): return 'guildonboarding'
+    if action_type.startswith('MEMBER_') or action_type == 'BOT_ADD': return 'user'
+    if action_type.startswith('MESSAGE_') or action_type.startswith('AUTO_MODERATION_'): return 'message'
+    return 'unknown'
+
+def _discord_py_raw_entry_to_dict(entry):
+    action = entry.action_type.value if hasattr(entry.action_type, 'value') else int(entry.action_type)
+    action_type = ACTIONS.get(action, f'UNKNOWN_{action}')
+    extra = entry.extra if isinstance(entry.extra, dict) else {}
+    channel_id = extra.get('channel_id')
+    count = extra.get('count', 1)
+    try: count = int(count)
+    except (TypeError, ValueError): count = 1
+    target_id = channel_id if action_type in {'MEMBER_MOVE', 'MEMBER_DISCONNECT'} and channel_id else entry.target_id
+    created_ms = (int(entry.id) >> 22) + 1420070400000
+    return {
+        'id': str(entry.id),
+        'action': action,
+        'targetId': str(target_id) if target_id is not None else 'unknown',
+        'targetType': 'channel' if action_type in {'MEMBER_MOVE', 'MEMBER_DISCONNECT'} else _target_type_for_action(action_type),
+        'guildId': str(entry.guild_id),
+        'executorId': str(entry.user_id) if entry.user_id is not None else '',
+        'createdTimestamp': created_ms,
+        'count': count,
+        'extra': {'channel': {'id': str(channel_id)}} if channel_id else {'count': count},
+    }
+
 async def attach(client, **options):
     clock = options.get('clock', lambda: int(datetime.now().timestamp() * 1000))
-    ledger = options.get('ledger', Ledger(clock=clock))
-    dispatcher = options.get('dispatcher', AlertDispatcher())
-    reconciler = options.get('reconciler', Reconciler(ledger, clock=clock))
+    ledger = options.get('ledger') or Ledger(clock=clock)
+    dispatcher = options.get('dispatcher') or AlertDispatcher(options.get('strategies', ()))
+    reconciler = options.get('reconciler') or Reconciler(ledger, clock=clock, tolerance_ms=options.get('tolerance_ms', 120000))
     bot_user_id = options.get('bot_user_id', lambda: getattr(client.user if client else None, 'id', None))
-    listener = AuditListener(client, reconciler, dispatcher, bot_user_id)
+    pending = set()
+    async def wait_for_pending():
+        snapshot = list(pending)
+        if snapshot:
+            await asyncio.wait(snapshot, timeout=options.get('pending_wait_ms', 5000) / 1000)
+    listener = AuditListener(client, reconciler, dispatcher, bot_user_id, wait_for_pending, clock)
 
-    # Auto-register against discord.py / py-cord clients that support add_listener.
-    # The handlers convert discord.py AuditLogEntry objects to the dict format normalize_audit expects.
-    if client is not None and callable(getattr(client, 'add_listener', None)):
+    # discord.py dispatches on_audit_log_entry_create. Pycord uses a raw event in
+    # versions where the high-level event can be suppressed by cache misses.
+    if client is not None:
         async def _audit_handler(entry):
             await listener.handle_audit(_discord_py_entry_to_dict(entry))
+        async def _raw_audit_handler(entry):
+            await listener.handle_audit(_discord_py_raw_entry_to_dict(entry))
         async def _message_handler(message):
             author = getattr(message, 'author', None)
             guild = getattr(message, 'guild', None)
@@ -173,17 +237,59 @@ async def attach(client, **options):
                 'author': {'id': str(author.id)},
                 'createdTimestamp': int(message.created_at.timestamp() * 1000),
             })
-        client.add_listener(_audit_handler, 'on_audit_log_entry_create')
-        client.add_listener(_message_handler, 'on_message')
-        listener._registered_audit_handler = _audit_handler
-        listener._registered_message_handler = _message_handler
+        handlers = [
+            (_audit_handler, 'on_audit_log_entry_create'),
+            (_audit_handler, 'on_audit_log_entry'),
+            (_raw_audit_handler, 'on_raw_audit_log_entry'),
+            (_message_handler, 'on_message'),
+        ]
+        if callable(getattr(client, 'add_listener', None)):
+            for handler, event_name in handlers:
+                client.add_listener(handler, event_name)
+            listener._registered_handlers = handlers
+        else:
+            patched = []
+            for handler, event_name in handlers:
+                existing = getattr(client, event_name, None)
+                async def combined(*args, _existing=existing, _handler=handler):
+                    await _handler(*args)
+                    if _existing is not None:
+                        result = _existing(*args)
+                        if inspect.isawaitable(result): await result
+                setattr(client, event_name, combined)
+                patched.append((event_name, existing, combined))
+            listener._patched_handlers = patched
 
     async def detach():
-        if client is not None and callable(getattr(client, 'remove_listener', None)):
-            if hasattr(listener, '_registered_audit_handler'):
-                client.remove_listener(listener._registered_audit_handler, 'on_audit_log_entry_create')
-            if hasattr(listener, '_registered_message_handler'):
-                client.remove_listener(listener._registered_message_handler, 'on_message')
+        if client is not None:
+            if callable(getattr(client, 'remove_listener', None)):
+                for handler, event_name in getattr(listener, '_registered_handlers', ()):
+                    client.remove_listener(handler, event_name)
+            for event_name, existing, combined in getattr(listener, '_patched_handlers', ()):
+                if getattr(client, event_name, None) is not combined: continue
+                if existing is None: delattr(client, event_name)
+                else: setattr(client, event_name, existing)
+
+    async def track(intent, operation):
+        if callable(intent):
+            marker = asyncio.get_running_loop().create_future()
+            pending.add(marker)
+            try:
+                result = operation()
+                if inspect.isawaitable(result):
+                    result = await result
+                await ledger.record(intent(result))
+                return result
+            finally:
+                pending.discard(marker)
+                if not marker.done(): marker.set_result(None)
+        entry = await ledger.record(intent)
+        try:
+            result = operation()
+            return await result if inspect.isawaitable(result) else result
+        except BaseException:
+            await ledger.remove(entry['correlationId'])
+            raise
 
     return {
         'ledger': ledger,
@@ -191,5 +297,6 @@ async def attach(client, **options):
         'dispatcher': dispatcher,
         'listener': listener,
         'intent': ledger.record,
+        'track': track,
         'detach': detach,
     }

@@ -18,7 +18,7 @@ Discord may collapse rapid `MEMBER_MOVE`, `MEMBER_DISCONNECT`, and `MESSAGE_DELE
 
 ## Message sends
 
-Plain message sends are not audit logged. Implementations reconcile self-authored `MESSAGE_CREATE` gateway events (`author.id == bot user ID`) as `MESSAGE_CREATE` intents using the message ID and guild ID. A self-message without an intent is drift. Direct messages have no guild ID and are outside the version 1 contract.
+Plain message sends are not audit logged. Implementations reconcile self-authored `MESSAGE_CREATE` gateway events (`author.id == bot user ID`) as `MESSAGE_CREATE` intents using the message ID and guild ID. Because Discord assigns the message ID, result-derived `track` registers the operation as in flight, records the returned ID, and allows the listener to wait up to five seconds before reconciliation. A self-message without an intent is drift. Direct messages have no guild ID and are outside the version 1 contract.
 
 ## Unknown audit actions
 

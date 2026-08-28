@@ -39,3 +39,16 @@ test('JS and Python action maps match parity-spec/audit-action-map.json', async 
   assert.equal(pyMap.size, specEntries.size, 'Python map has extra entries');
 });
 
+test('canonical action map matches the installed discord.js audit event enum', async () => {
+  const specMap = read('audit-action-map.json').actions;
+  const { AuditLogEvent } = await import('discord.js');
+  const canonical = value => value.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toUpperCase();
+  const runtimeMap = Object.fromEntries(Object.entries(AuditLogEvent)
+    .filter(([, code]) => Number.isInteger(code))
+    .map(([name, code]) => [String(code), canonical(name)]));
+  // discord.js 14.27.0 still calls code 192 VoiceChannelStatusCreate; Discord's
+  // current API table and changelog call the same code VOICE_CHANNEL_STATUS_UPDATE.
+  if (runtimeMap['192'] === 'VOICE_CHANNEL_STATUS_CREATE') runtimeMap['192'] = 'VOICE_CHANNEL_STATUS_UPDATE';
+  assert.deepEqual(specMap, runtimeMap);
+});
+
