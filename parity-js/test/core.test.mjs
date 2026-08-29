@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EventEmitter } from 'node:events';
-import { attach, attachAutoWrap, AuditListener, Ledger, MemoryLedgerAdapter, Reconciler } from '../src/index.js';
+import { attach, attachAutoWrap, AuditListener, Ledger, MemoryLedgerAdapter, OperationJournal, Reconciler } from '../src/index.js';
 const now = Date.parse('2026-08-07T12:00:00.000Z');
 const clock = () => now;
 const intent = (overrides = {}) => ({ actionType: 'CHANNEL_CREATE', targetId: 'target', targetType: 'channel', guildId: 'guild', correlationId: 'intent-1', ...overrides });
@@ -39,6 +39,34 @@ test('track removes a pre-call intent when the operation fails and can derive ge
   assert.equal(result.id, 'discord-id');
   assert.equal((await parity.ledger.entries())[0].targetId, 'discord-id');
   parity.detach();
+});
+test('operation journal correlates code intents, Discord outcomes, failures, and external events', async () => {
+  const client = new EventEmitter();
+  client.user = { id: 'bot' };
+  const delivered = [];
+  const parity = attach(client, { clock, onEvent: async record => delivered.push(record) });
+  await parity.intent(intent({ correlationId: 'journal-match' }));
+  client.emit('guildAuditLogEntryCreate', { id: 'journal-audit', action: 10, targetId: 'target', targetType: 'channel', executorId: 'bot', createdTimestamp: now }, { id: 'guild' });
+  await new Promise(resolve => setImmediate(resolve));
+  await assert.rejects(parity.track(intent({ correlationId: 'journal-failed' }), async () => { throw new Error('rejected'); }), /rejected/);
+  client.emit('guildAuditLogEntryCreate', { id: 'external-audit', action: 10, targetId: 'external', targetType: 'channel', executorId: 'other', createdTimestamp: now }, { id: 'guild' });
+  await new Promise(resolve => setImmediate(resolve));
+  const records = parity.journal.entries();
+  assert.ok(records.some(record => record.phase === 'discord-matched' && record.matchedCorrelationIds.includes('journal-match')));
+  assert.ok(records.some(record => record.phase === 'code-operation-failed' && record.correlationId === 'journal-failed'));
+  assert.ok(records.some(record => record.phase === 'discord-ignored' && record.reason === 'executor-mismatch'));
+  assert.deepEqual(delivered, records);
+  const journal = new OperationJournal({ limit: 2, clock });
+  journal.record({ phase: 'first' }); journal.record({ phase: 'second' }); journal.record({ phase: 'third' });
+  assert.deepEqual(journal.entries().map(record => record.phase), ['second', 'third']);
+  parity.detach();
+});
+test('detailed reconciliation identifies every consumed correlation ID', async () => {
+  const ledger = new Ledger({ clock });
+  await ledger.record(intent({ actionType: 'MEMBER_MOVE', targetId: 'a', correlationId: 'detailed-a' }));
+  await ledger.record(intent({ actionType: 'MEMBER_MOVE', targetId: 'b', correlationId: 'detailed-b' }));
+  const outcome = await new Reconciler({ ledger, clock }).reconcileDetailed(event({ actionType: 'MEMBER_MOVE', targetId: 'ignored', count: 2 }));
+  assert.deepEqual(outcome, { status: 'matched', report: null, matchedCorrelationIds: ['detailed-a', 'detailed-b'] });
 });
 test('result-derived track holds gateway reconciliation until the generated ID is ledgered', async () => {
   const client = new EventEmitter();

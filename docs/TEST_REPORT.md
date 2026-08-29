@@ -1,6 +1,6 @@
 # Project Parity test report
 
-**Version reported: 1.1.0**
+**Version reported: 1.2.0**
 
 This release pass exercised both implementations beyond their basic contract cases. The focus was matching at timing boundaries, malformed or unmatched self-actions, collapsed audit bursts, retention behavior, and serialized reconciliation under concurrent calls. The random scenarios use fixed seeds and injected clocks, so a failure should be reproducible rather than dependent on wall-clock timing.
 
@@ -8,14 +8,14 @@ This release pass exercised both implementations beyond their basic contract cas
 
 | Suite | Scope | Count | Result |
 | --- | --- | ---: | --- |
-| Root specification and cross-language tests | Schemas, rules, 8 byte-identical report fixtures, target extraction fixtures, generated maps, discord.js enum | 7 | Pass |
-| JavaScript unit and stress tests | Core behavior, attach/track/auto-wrap coverage, counted bulk deletes, seeded fuzzing, 10,000-entry burst, 1,000 concurrent reconciliations | 22 | Pass |
-| Python unit and stress tests | Core behavior, both registration paths, target extraction, counted bulk deletes, generated-ID race, fuzzing and stress | 19 | Pass |
+| Root specification and cross-language tests | Schemas, rules, 8 byte-identical report fixtures, target extraction fixtures, generated maps, discord.js enum, byte-identical journal records | 8 | Pass |
+| JavaScript unit and stress tests | Core behavior, attach/track/auto-wrap coverage, lifecycle journal, counted bulk deletes, seeded fuzzing, 10,000-entry burst, 1,000 concurrent reconciliations | 24 | Pass |
+| Python unit and stress tests | Core behavior, both registration paths, lifecycle journal, target extraction, counted bulk deletes, generated-ID race, fuzzing and stress | 21 | Pass |
 | JavaScript live matrix | Disposable channels, roles, webhook, self-messages, manual and wrapped reconciliation | 14 | Pass |
-| Python live matrix | Isolated discord.py 2.5.2, disposable channel and self-messages | 5 | Pass |
-| JavaScript live target matrix | Disposable webhook messages, audit target inspection, exact bulk-delete count, cleanup verification | 5 | Pass |
+| Python live matrix | py-cord 2.6.1, disposable channel and self-messages | 5 | Pass |
+| JavaScript live target matrix | Disposable webhook messages, audit target inspection, exact bulk-delete count, lifecycle correlation, cleanup verification | 6 | Pass |
 
-The root `npm test` command runs all **48** checks: 7 specification/cross-language, 22 JavaScript, and 19 Python.
+The root `npm test` command runs all **53** checks: 8 specification/cross-language, 24 JavaScript, and 21 Python.
 
 ## Benchmark method
 
@@ -66,6 +66,14 @@ npm run live-test:targets
 ```
 
 The live commands skip successfully when credentials are absent. For an operator-run tenant check, use an isolated Python environment containing only `discord.py` (not py-cord in the same environment), follow [setup instructions](setup.md#live-discord-check), set the token only in the environment or ignored `.env`, and provide `PARITY_GUILD_ID`.
+
+---
+
+## Version 1.2.0 lifecycle correlation and live validation
+
+`attach()` now exposes a bounded in-memory `journal`, with an optional `onEvent` delivery hook. It records code-side intent, REST success or rejection, audit/message observation, ignored non-bot or duplicate events, and the final matched or drift outcome. A match includes every consumed `correlationId`, including collapsed-burst matches. The existing drift report format and `reconcile()` return value remain unchanged.
+
+The full JavaScript live matrix passed **14/14** on 2026-08-29 and removed every disposable resource. The target matrix passed **6/6**, including a real `MESSAGE_BULK_DELETE` audit with `count=2` mapped to the exact intent correlation ID. The Python matrix passed **5/5** on py-cord 2.6.1 after the harness was corrected to attach from both discord.py's `setup_hook` and py-cord's ready lifecycle. Same-app webhook single-message deletes remained unaudited, which the target harness treats as explicitly unavailable rather than a passing match.
 
 ---
 

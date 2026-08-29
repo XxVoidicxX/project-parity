@@ -1,5 +1,3 @@
-"""Live discord.py integration check using only disposable parity-py-test-* resources."""
-
 import asyncio
 import os
 import sys
@@ -57,12 +55,23 @@ class LiveClient(discord.Client):
         self.results = []
         self.raw_shapes = []
 
+    async def ensure_parity(self):
+        if self.parity is None:
+            self.parity = await attach(self, strategies=[self.collector])
+
+    async def close(self):
+        session = getattr(self.http, '_HTTPClient__session', None)
+        if session is not None and not session.closed:
+            await session.close()
+        await super().close()
+
     async def setup_hook(self):
-        self.parity = await attach(self, strategies=[self.collector])
+        await self.ensure_parity()
 
     async def on_ready(self):
         if self.started:
             return
+        await self.ensure_parity()
         self.started = True
         asyncio.create_task(self.run_checks())
 

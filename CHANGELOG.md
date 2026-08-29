@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] - 2026-08-29
+
+### Added
+
+- `OperationJournal` in JavaScript and Python records a bounded, normalized lifecycle for code intent, REST success/rejection, Discord observation, match/drift, duplicate suppression, and non-bot events. `attach()` exposes it as `journal` and accepts `onEvent` for external observability.
+- `reconcileDetailed` / `reconcile_detailed` identify every ledger correlation ID consumed by an audit event, including collapsed bursts, while preserving the existing report-returning reconciliation API.
+- Cross-language and runtime tests assert journal record parity, matched correlation IDs, failure cleanup, bounded retention, and ignored external events.
+
 ## [1.1.0] - 2026-08-27
 
 ### Added

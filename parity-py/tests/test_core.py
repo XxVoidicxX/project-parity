@@ -2,7 +2,7 @@ import asyncio
 import unittest
 from datetime import datetime, timezone
 
-from parity_py import attach, AlertDispatcher, AuditListener, Ledger, Reconciler, SqliteLedgerAdapter, _discord_py_entry_to_dict, _target_type_for_action
+from parity_py import attach, AlertDispatcher, AuditListener, Ledger, OperationJournal, Reconciler, SqliteLedgerAdapter, _discord_py_entry_to_dict, _target_type_for_action
 
 NOW = 1786104000000
 
@@ -111,6 +111,38 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(await ledger.entries()), 1)
         await ledger.purge(NOW + 240001)
         self.assertEqual(len(await ledger.entries()), 0)
+
+    async def test_operation_journal_correlates_code_discord_failures_and_external_events(self):
+        class Client:
+            def __init__(self): self.user = type('User', (), {'id': 'bot'})()
+            def add_listener(self, handler, name): setattr(self, name, handler)
+            def remove_listener(self, handler, name):
+                if getattr(self, name, None) is handler: delattr(self, name)
+        delivered = []
+        client = Client()
+        parity = await attach(client, clock=lambda: NOW, on_event=lambda record: delivered.append(record))
+        await parity['intent'](intent(correlationId='journal-match'))
+        await parity['listener'].handle_audit(event(actionType=10, targetType='channel', auditEntryId='journal-audit'))
+        async def rejected(): raise RuntimeError('rejected')
+        with self.assertRaisesRegex(RuntimeError, 'rejected'):
+            await parity['track'](intent(correlationId='journal-failed'), rejected)
+        await parity['listener'].handle_audit(event(actionType=10, targetId='external', targetType='channel', executorId='other', auditEntryId='external-audit'))
+        records = parity['journal'].entries()
+        self.assertTrue(any(record['phase'] == 'discord-matched' and 'journal-match' in record['matchedCorrelationIds'] for record in records))
+        self.assertTrue(any(record['phase'] == 'code-operation-failed' and record['correlationId'] == 'journal-failed' for record in records))
+        self.assertTrue(any(record['phase'] == 'discord-ignored' and record['reason'] == 'executor-mismatch' for record in records))
+        self.assertEqual(delivered, records)
+        journal = OperationJournal(2, lambda: NOW)
+        journal.record({'phase': 'first'}); journal.record({'phase': 'second'}); journal.record({'phase': 'third'})
+        self.assertEqual([record['phase'] for record in journal.entries()], ['second', 'third'])
+        await parity['detach']()
+
+    async def test_detailed_reconciliation_identifies_every_consumed_correlation_id(self):
+        ledger = Ledger(clock=lambda: NOW)
+        await ledger.record(intent(actionType='MEMBER_MOVE', targetId='a', correlationId='detailed-a'))
+        await ledger.record(intent(actionType='MEMBER_MOVE', targetId='b', correlationId='detailed-b'))
+        outcome = await Reconciler(ledger, clock=lambda: NOW).reconcile_detailed(event(actionType='MEMBER_MOVE', targetId='ignored', count=2))
+        self.assertEqual(outcome, {'status': 'matched', 'report': None, 'matchedCorrelationIds': ['detailed-a', 'detailed-b']})
 
     async def test_bulk_message_delete_requires_one_exact_counted_intent(self):
         ledger = Ledger(clock=lambda: NOW)

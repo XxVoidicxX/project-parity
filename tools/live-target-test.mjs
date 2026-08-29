@@ -44,6 +44,7 @@ const waitFor = async (predicate, milliseconds = 25000, start = 0) => {
 };
 const auditFor = (action, channelId, start) => waitFor(index => audits.slice(index).find(entry => entry.action === action && entry.channelId === String(channelId)), 25000, start);
 const driftFor = (actionType, targetId, start) => waitFor(index => drifts.slice(index).find(report => report.event.actionType === actionType && String(report.event.targetId) === String(targetId)), 12000, start);
+const journalFor = (correlationId, start) => waitFor(() => parity.journal.entries().slice(start).find(record => record.phase === 'discord-matched' && record.matchedCorrelationIds.includes(correlationId)), 12000, start);
 
 client.on('guildAuditLogEntryCreate', (entry, guild) => {
   if (String(guild.id) !== String(guildId)) return;
@@ -96,16 +97,19 @@ client.once(Events.ClientReady, async () => {
 
     const bulkStart = drifts.length;
     const bulkAuditStart = audits.length;
+    const bulkJournalStart = parity.journal.entries().length;
     const bulkMessages = await Promise.all([
       created.webhook.send({ content: 'parity target test bulk one', wait: true }),
       created.webhook.send({ content: 'parity target test bulk two', wait: true }),
     ]);
-    await parity.intent({ actionType: 'MESSAGE_BULK_DELETE', targetId: String(created.channel.id), targetType: 'channel', guildId: String(guildId), count: bulkMessages.length });
+    const bulkIntent = await parity.intent({ actionType: 'MESSAGE_BULK_DELETE', targetId: String(created.channel.id), targetType: 'channel', guildId: String(guildId), count: bulkMessages.length });
     await created.channel.bulkDelete(bulkMessages.map(message => message.id), true);
     const bulkAudit = await auditFor(73, created.channel.id, bulkAuditStart);
     record('bulk delete audit arrives with exact count', !!bulkAudit && bulkAudit.count === bulkMessages.length, bulkAudit ? `count=${bulkAudit.count}` : 'no audit entry');
     const bulkDrift = await driftFor('MESSAGE_BULK_DELETE', created.channel.id, bulkStart);
     record('counted bulk delete intent reconciles', !bulkDrift, bulkDrift ? 'unexpected drift' : 'clean');
+    const bulkJournal = await journalFor(bulkIntent.correlationId, bulkJournalStart);
+    record('journal maps bulk audit to exact code intent', !!bulkJournal, bulkJournal ? `correlationId=${bulkIntent.correlationId}` : 'no matched lifecycle record');
   } catch (error) {
     record('live target test completed', false, error.message);
   } finally {

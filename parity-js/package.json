@@ -1,2 +1,2 @@
-{"name":"@project-parity/js","version":"1.1.0","type":"module","main":"./src/index.js","exports":"./src/index.js","peerDependencies":{"discord.js":"^14.0.0"},"scripts":{"test":"node --test test/*.test.mjs"}}
+{"name":"@project-parity/js","version":"1.2.0","type":"module","main":"./src/index.js","exports":"./src/index.js","peerDependencies":{"discord.js":"^14.0.0"},"scripts":{"test":"node --test test/*.test.mjs"}}
 

@@ -110,6 +110,21 @@ class Ledger:
             if ms(entry['expiresAt']) + retention_ms < now:
                 await self.remove(entry['correlationId'])
 
+class OperationJournal:
+    def __init__(self, limit=1000, clock=lambda: int(datetime.now().timestamp() * 1000)):
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+            raise ValueError('Journal limit must be a positive integer')
+        self.limit, self.clock, self.sequence, self.records = limit, clock, 0, []
+    def record(self, record):
+        self.sequence += 1
+        stored = {'sequence': self.sequence, 'recordedAt': iso(self.clock()), **copy.deepcopy(record)}
+        self.records.append(stored)
+        if len(self.records) > self.limit:
+            del self.records[:len(self.records) - self.limit]
+        return copy.deepcopy(stored)
+    def entries(self): return copy.deepcopy(self.records)
+    def clear(self): self.records = []
+
 class Reconciler:
     def __init__(self, ledger, clock=lambda: int(datetime.now().timestamp() * 1000), tolerance_ms=120000):
         self.ledger, self.clock, self.tolerance_ms, self.lock = ledger, clock, tolerance_ms, asyncio.Lock()
@@ -119,19 +134,21 @@ class Reconciler:
         except (TypeError, ValueError, OverflowError): return 1, False
         return (count, True) if isinstance(value, int) and not isinstance(value, bool) and 1 <= count <= MAX_AUDIT_COUNT else (min(max(count, 1), MAX_AUDIT_COUNT), False)
     async def reconcile(self, event):
+        return (await self.reconcile_detailed(event))['report']
+    async def reconcile_detailed(self, event):
         async with self.lock:
             count, valid_count = self._count(event.get('count', 1))
             canonical = {**event, 'actionType': str(event['actionType']), 'targetId': str(event['targetId']), 'targetType': str(event['targetType']), 'guildId': str(event['guildId']), 'executorId': str(event['executorId']), 'auditEntryId': None if event.get('auditEntryId') is None else str(event['auditEntryId']), 'count': count}
             entries = await self.ledger.entries()
             if not valid_count:
-                return self.report(canonical, self.nearest(canonical, entries))
+                return self.drift(canonical, self.nearest(canonical, entries))
             eligible = [entry for entry in entries if entry['guildId'] == canonical['guildId'] and entry['actionType'] == canonical['actionType'] and entry['targetType'] == canonical['targetType'] and ms(entry['expiresAt']) >= ms(canonical['occurredAt']) and abs(ms(entry['timestamp']) - ms(canonical['occurredAt'])) <= self.tolerance_ms]
             if canonical['actionType'] == 'MESSAGE_BULK_DELETE':
                 exact = sorted((entry for entry in eligible if entry['targetId'] == canonical['targetId'] and entry.get('count') == count), key=lambda entry: (ms(entry['timestamp']), entry['correlationId']))[:1]
                 if exact:
                     await self.ledger.remove(exact[0]['correlationId'])
-                    return None
-                return self.report(canonical, self.nearest(canonical, entries))
+                    return self.matched(exact)
+                return self.drift(canonical, self.nearest(canonical, entries))
             burst = canonical['actionType'] in COLLAPSED and count > 1
             if burst:
                 selected, units = [], 0
@@ -147,8 +164,11 @@ class Reconciler:
             for entry in selected:
                 await self.ledger.remove(entry['correlationId'])
             if units == count:
-                return None
-            return self.report(canonical, self.nearest(canonical, [entry for entry in entries if entry not in selected]))
+                return self.matched(selected)
+            return self.drift(canonical, self.nearest(canonical, [entry for entry in entries if entry not in selected]), selected)
+    @staticmethod
+    def matched(entries): return {'status': 'matched', 'report': None, 'matchedCorrelationIds': [entry['correlationId'] for entry in entries]}
+    def drift(self, event, near, consumed=()): return {'status': 'drift', 'report': self.report(event, near), 'matchedCorrelationIds': [entry['correlationId'] for entry in consumed]}
     def nearest(self, event, entries):
         candidates = [entry for entry in entries if entry['guildId'] == event['guildId']]
         if not candidates: return None
@@ -163,9 +183,16 @@ class AlertDispatcher:
     async def dispatch(self, report): await asyncio.gather(*(strategy.send(report) for strategy in self.strategies))
 
 class AuditListener:
-    def __init__(self, client, reconciler, dispatcher, bot_user_id, wait_for_pending=None, clock=lambda: int(datetime.now().timestamp() * 1000), dedupe_ttl_ms=600000):
+    def __init__(self, client, reconciler, dispatcher, bot_user_id, wait_for_pending=None, clock=lambda: int(datetime.now().timestamp() * 1000), dedupe_ttl_ms=600000, on_event=None):
         self.client, self.reconciler, self.dispatcher, self.bot_user_id = client, reconciler, dispatcher, bot_user_id
         self.wait_for_pending, self.clock, self.dedupe_ttl_ms, self.seen = wait_for_pending or (lambda: asyncio.sleep(0)), clock, dedupe_ttl_ms, {}
+        self.on_event = on_event or (lambda record: None)
+    async def observe(self, record):
+        try:
+            result = self.on_event(record)
+            if inspect.isawaitable(result): await result
+        except Exception:
+            pass
     def duplicate(self, audit_id):
         if audit_id is None: return False
         now = self.clock()
@@ -175,9 +202,17 @@ class AuditListener:
         return False
     async def handle_audit(self, entry):
         event = self.normalize_audit(entry)
-        if event['executorId'] != str(self.bot_user_id()) or self.duplicate(event['auditEntryId']): return None
+        await self.observe({'phase': 'discord-observed', 'transport': 'audit', 'event': event})
+        if event['executorId'] != str(self.bot_user_id()):
+            await self.observe({'phase': 'discord-ignored', 'transport': 'audit', 'reason': 'executor-mismatch', 'event': event})
+            return None
+        if self.duplicate(event['auditEntryId']):
+            await self.observe({'phase': 'discord-ignored', 'transport': 'audit', 'reason': 'duplicate', 'event': event})
+            return None
         await self.wait_for_pending()
-        report = await self.reconciler.reconcile(event)
+        outcome = await self.reconciler.reconcile_detailed(event)
+        await self.observe({'phase': 'discord-matched' if outcome['status'] == 'matched' else 'discord-drift', 'transport': 'audit', 'event': event, 'matchedCorrelationIds': outcome['matchedCorrelationIds'], **({'driftState': outcome['report']['ledger']['state']} if outcome['report'] else {})})
+        report = outcome['report']
         if report: await self.dispatcher.dispatch(report)
         return report
     @staticmethod
@@ -192,10 +227,16 @@ class AuditListener:
         return {**entry, 'actionType': action_type, **target, 'guildId': guild_id, 'executorId': str(entry.get('executorId', (entry.get('executor') or {}).get('id', ''))), 'auditEntryId': audit_entry_id, 'occurredAt': occurred_at, 'count': extra.get('count', entry.get('count', 1))}
     async def handle_message(self, message):
         author = message.get('author', {})
-        if str(author.get('id')) != str(self.bot_user_id()) or not message.get('guildId'): return None
+        if not message.get('guildId'): return None
         event = {'actionType': 'MESSAGE_CREATE', 'targetId': str(message['id']), 'targetType': 'message', 'guildId': str(message['guildId']), 'executorId': str(author['id']), 'auditEntryId': None, 'occurredAt': iso(message.get('createdTimestamp', 0)), 'count': 1}
+        await self.observe({'phase': 'discord-observed', 'transport': 'message', 'event': event})
+        if event['executorId'] != str(self.bot_user_id()):
+            await self.observe({'phase': 'discord-ignored', 'transport': 'message', 'reason': 'executor-mismatch', 'event': event})
+            return None
         await self.wait_for_pending()
-        report = await self.reconciler.reconcile(event)
+        outcome = await self.reconciler.reconcile_detailed(event)
+        await self.observe({'phase': 'discord-matched' if outcome['status'] == 'matched' else 'discord-drift', 'transport': 'message', 'event': event, 'matchedCorrelationIds': outcome['matchedCorrelationIds'], **({'driftState': outcome['report']['ledger']['state']} if outcome['report'] else {})})
+        report = outcome['report']
         if report: await self.dispatcher.dispatch(report)
         return report
 
@@ -281,13 +322,30 @@ async def attach(client, **options):
     ledger = options.get('ledger') or Ledger(clock=clock)
     dispatcher = options.get('dispatcher') or AlertDispatcher(options.get('strategies', ()))
     reconciler = options.get('reconciler') or Reconciler(ledger, clock=clock, tolerance_ms=options.get('tolerance_ms', 120000))
+    journal = options.get('journal') or OperationJournal(options.get('journal_limit', 1000), clock)
+    def project_entry(entry): return {key: entry[key] for key in ['correlationId', 'actionType', 'targetId', 'targetType', 'guildId'] if key in entry} | ({'count': entry['count']} if 'count' in entry else {})
+    async def observe(record):
+        stored = journal.record(record)
+        try:
+            result = options.get('on_event', lambda value: None)(stored)
+            if inspect.isawaitable(result): await result
+        except Exception:
+            pass
+        return stored
+    async def record_intent(intent, source='manual'):
+        entry = await ledger.record(intent)
+        await observe({'phase': 'code-intent-recorded', 'source': source, **project_entry(entry)})
+        return entry
+    async def cancel_intent(entry, source='track'):
+        await ledger.remove(entry['correlationId'])
+        await observe({'phase': 'code-operation-failed', 'source': source, **project_entry(entry), 'reason': 'operation-rejected'})
     bot_user_id = options.get('bot_user_id', lambda: getattr(client.user if client else None, 'id', None))
     pending = set()
     async def wait_for_pending():
         snapshot = list(pending)
         if snapshot:
             await asyncio.wait(snapshot, timeout=options.get('pending_wait_ms', 5000) / 1000)
-    listener = AuditListener(client, reconciler, dispatcher, bot_user_id, wait_for_pending, clock)
+    listener = AuditListener(client, reconciler, dispatcher, bot_user_id, wait_for_pending, clock, on_event=observe)
 
     if client is not None:
         async def _audit_handler(entry):
@@ -346,17 +404,20 @@ async def attach(client, **options):
                 result = operation()
                 if inspect.isawaitable(result):
                     result = await result
-                await ledger.record(intent(result))
+                entry = await record_intent(intent(result), 'track-result')
+                await observe({'phase': 'code-operation-succeeded', 'source': 'track-result', **project_entry(entry)})
                 return result
             finally:
                 pending.discard(marker)
                 if not marker.done(): marker.set_result(None)
-        entry = await ledger.record(intent)
+        entry = await record_intent(intent, 'track-before')
         try:
             result = operation()
-            return await result if inspect.isawaitable(result) else result
+            result = await result if inspect.isawaitable(result) else result
+            await observe({'phase': 'code-operation-succeeded', 'source': 'track-before', **project_entry(entry)})
+            return result
         except BaseException:
-            await ledger.remove(entry['correlationId'])
+            await cancel_intent(entry, 'track-before')
             raise
 
     return {
@@ -364,7 +425,9 @@ async def attach(client, **options):
         'reconciler': reconciler,
         'dispatcher': dispatcher,
         'listener': listener,
-        'intent': ledger.record,
+        'journal': journal,
+        'intent': record_intent,
+        'cancel_intent': cancel_intent,
         'track': track,
         'detach': detach,
     }

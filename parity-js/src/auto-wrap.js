@@ -37,7 +37,7 @@ function pushUnique(list, item, key) {
   if (!list.some(existing => key(existing) === key(item))) list.push(item);
 }
 
-function wrapManager(manager, ledger, guildId, parityTrack, state, options = {}, slot = 'manual') {
+function wrapManager(manager, parityIntent, parityCancel, guildId, parityTrack, state, options = {}, slot = 'manual') {
   if (manager?.[WRAPPED_MANAGER]) return manager;
   const managerClass = manager?.constructor?.name ?? 'unknown';
   const methodMap = REST_ACTION_MAP.get(managerClass);
@@ -71,11 +71,11 @@ function wrapManager(manager, ledger, guildId, parityTrack, state, options = {},
             () => value.apply(target, args),
           );
         }
-        const entry = await ledger.record({ actionType, targetId: resolveTargetId(args), targetType, guildId: resolvedGuildId });
+        const entry = await parityIntent({ actionType, targetId: resolveTargetId(args), targetType, guildId: resolvedGuildId }, 'auto-wrap');
         try {
           return await value.apply(target, args);
         } catch (error) {
-          await ledger.remove(entry.correlationId);
+          await parityCancel(entry, 'auto-wrap');
           throw error;
         }
       };
@@ -85,7 +85,8 @@ function wrapManager(manager, ledger, guildId, parityTrack, state, options = {},
 
 export function attachAutoWrap(client, parity, options = {}) {
   if (parity[AUTO_WRAP_STATE]) return parity;
-  const ledger = parity.ledger;
+  const parityIntent = parity.intent.bind(parity);
+  const parityCancel = parity.cancelIntent.bind(parity);
   const parityTrack = parity.track?.bind(parity);
   const state = { catalogue: AUTO_WRAP_COVERAGE.map(entry => ({ ...entry, methods: [...entry.methods], knownUnsupportedMutations: [...entry.knownUnsupportedMutations] })), wrapped: [], unsupportedManagers: [], unsupportedCalls: [] };
   const installed = [];
@@ -93,7 +94,7 @@ export function attachAutoWrap(client, parity, options = {}) {
   const wrapGuild = guild => {
     for (const slot of ['roles', 'channels', 'members', 'bans']) {
       const original = guild[slot];
-      const wrapped = wrapManager(original, ledger, String(guild.id), parityTrack, state, options, slot);
+      const wrapped = wrapManager(original, parityIntent, parityCancel, String(guild.id), parityTrack, state, options, slot);
       if (wrapped === original) continue;
       guild[slot] = wrapped;
       installed.push({ guild, slot, original, wrapped });
@@ -106,7 +107,7 @@ export function attachAutoWrap(client, parity, options = {}) {
 
   const originalDetach = parity.detach.bind(parity);
   parity.getAutoWrapCoverage = () => structuredClone(state);
-  parity.wrapManager = (manager, guildId) => wrapManager(manager, ledger, String(guildId ?? 'unknown'), parityTrack, state, options, 'manual');
+  parity.wrapManager = (manager, guildId) => wrapManager(manager, parityIntent, parityCancel, String(guildId ?? 'unknown'), parityTrack, state, options, 'manual');
   parity.detach = () => {
     client.off?.('guildCreate', guildCreateHandler);
     for (const { guild, slot, original, wrapped } of installed) if (guild[slot] === wrapped) guild[slot] = original;
