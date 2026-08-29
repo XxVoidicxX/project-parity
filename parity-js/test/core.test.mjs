@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EventEmitter } from 'node:events';
-import { attach, attachAutoWrap, AuditListener, Ledger, MemoryLedgerAdapter, OperationJournal, Reconciler } from '../src/index.js';
+import { attach, attachAutoWrap, AuditListener, formatDriftAlert, Ledger, MemoryLedgerAdapter, OperationJournal, Reconciler } from '../src/index.js';
 const now = Date.parse('2026-08-07T12:00:00.000Z');
 const clock = () => now;
 const intent = (overrides = {}) => ({ actionType: 'CHANNEL_CREATE', targetId: 'target', targetType: 'channel', guildId: 'guild', correlationId: 'intent-1', ...overrides });
@@ -30,6 +30,27 @@ test('bulk message delete requires one exact counted intent', async () => {
   await assert.rejects(ledger.record(intent({ correlationId: 'bad-count', count: 0 })), /Intent count/);
 });
 test('mocked gateway detects rogue audit action and self message action', async () => { const client = new EventEmitter(); client.user = { id: 'bot' }; const reports = []; const parity = attach(client, { clock, strategies: [{ send: async report => reports.push(report) }] }); await parity.intent(intent()); client.emit('guildAuditLogEntryCreate', { id: 'audit-ok', action: 10, targetId: 'target', targetType: 'channel', executorId: 'bot', createdTimestamp: now }, { id: 'guild' }); await new Promise(resolve => setImmediate(resolve)); client.emit('guildAuditLogEntryCreate', { id: 'audit-rogue', action: 10, targetId: 'rogue', targetType: 'channel', executorId: 'bot', createdTimestamp: now }, { id: 'guild' }); client.emit('messageCreate', { id: 'message-rogue', guildId: 'guild', author: { id: 'bot' }, createdTimestamp: now }); await new Promise(resolve => setImmediate(resolve)); assert.equal(reports.length, 2); assert.equal(reports[0].event.targetId, 'rogue'); assert.equal(reports[1].event.actionType, 'MESSAGE_CREATE'); parity.detach(); });
+test('attach can alert a private Discord channel in plain incident language', async () => {
+  const client = new EventEmitter();
+  client.user = { id: 'bot' };
+  const messages = [];
+  const channel = { guildId: 'guild', isTextBased: () => true, send: async payload => {
+    messages.push(payload);
+    const message = { id: 'parity-alert-message', guildId: 'guild', author: { id: 'bot' }, createdTimestamp: now };
+    client.emit('messageCreate', message);
+    return message;
+  } };
+  client.channels = { cache: new Map([['alerts', channel]]), fetch: async () => channel };
+  const parity = attach(client, { clock, alertChannelId: 'alerts', alertUserId: 'owner' });
+  client.emit('guildAuditLogEntryCreate', { id: 'owner-alert', action: 10, targetId: 'rogue', targetType: 'channel', executorId: 'bot', createdTimestamp: now }, { id: 'guild' });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.match(messages[0].content, /^<@owner> Parity detected an action this bot process did not plan/);
+  assert.match(messages[0].content, /Do now: Immediately rotate the bot token/);
+  assert.equal(messages.length, 1);
+  assert.ok(parity.journal.entries().some(record => record.phase === 'discord-matched' && record.event.targetId === 'parity-alert-message'));
+  assert.equal(formatDriftAlert((await parity.reconciler.reconcileDetailed(event({ targetId: 'another-rogue' }))).report).includes('{'), false);
+  parity.detach();
+});
 test('track removes a pre-call intent when the operation fails and can derive generated target IDs', async () => {
   const client = new EventEmitter();
   const parity = attach(client, { clock });
@@ -47,7 +68,7 @@ test('operation journal correlates code intents, Discord outcomes, failures, and
   const parity = attach(client, { clock, onEvent: async record => delivered.push(record) });
   await parity.intent(intent({ correlationId: 'journal-match' }));
   client.emit('guildAuditLogEntryCreate', { id: 'journal-audit', action: 10, targetId: 'target', targetType: 'channel', executorId: 'bot', createdTimestamp: now }, { id: 'guild' });
-  await new Promise(resolve => setImmediate(resolve));
+  await new Promise(resolve => setTimeout(resolve, 10));
   await assert.rejects(parity.track(intent({ correlationId: 'journal-failed' }), async () => { throw new Error('rejected'); }), /rejected/);
   client.emit('guildAuditLogEntryCreate', { id: 'external-audit', action: 10, targetId: 'external', targetType: 'channel', executorId: 'other', createdTimestamp: now }, { id: 'guild' });
   await new Promise(resolve => setImmediate(resolve));

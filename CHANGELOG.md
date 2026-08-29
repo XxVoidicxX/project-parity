@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows [Semantic Versioning](https://semver.org/).
 
+## [1.3.0] - 2026-08-29
+
+### Added
+
+- `attach()` now accepts `alertChannelId` / `alertUserId` in JavaScript and `alert_channel_id` / `alert_user_id` in Python. It posts a bounded plain-language drift incident message to a private Discord channel without requiring custom alert code.
+- `DiscordChannelAlertStrategy` and `formatDriftAlert` / `format_drift_alert` are public in both implementations. Their human-facing text is asserted byte-for-byte across languages.
+- Root `AGENTS.md` gives coding agents the required private owner-alert configuration, action-recording rules, and incident-response steps.
+- The disposable Discord target matrix now proves that an owner alert is delivered once and that its bot-authored message reconciles instead of creating an alert loop.
+
 ## [1.2.0] - 2026-08-29
 
 ### Added

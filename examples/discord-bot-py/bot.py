@@ -1,61 +1,23 @@
-"""
-Example discord.py bot with Project Parity drift detection integrated.
-
-Install:
-    pip install discord.py python-dotenv
-    cp .env.example .env   # then fill in your token
-
-Run:
-    python bot.py
-
-The bot needs these gateway intents:
-  - moderation (discord.py's name for GUILD_MODERATION / audit-log delivery)
-  - MESSAGE_CONTENT (if you want the !parity commands to work)
-"""
-
 import asyncio
 import os
 import sys
 from pathlib import Path
 
-# Resolve parity-py relative to this file's location in examples/discord-bot-py
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / 'parity-py'))
 
 import discord
 from dotenv import load_dotenv
-from parity_py import attach, AlertDispatcher
+from parity_py import attach
 
 load_dotenv()
 
 TOKEN = os.getenv('DISCORD_BOT_TOKEN')
 ALERT_CHANNEL_ID = os.getenv('PARITY_ALERT_CHANNEL_ID')
+ALERT_USER_ID = os.getenv('PARITY_ALERT_USER_ID')
 
 if not TOKEN:
     sys.exit('Set DISCORD_BOT_TOKEN in .env or the environment.')
-
-
-class ParityStrategy:
-    def __init__(self, bot_ref):
-        self.bot = bot_ref
-
-    async def send(self, report):
-        event = report['event']
-        print(f'[PARITY DRIFT] {event["actionType"]} on {event["targetId"]} in {event["guildId"]} '
-              f'(confidence={report["confidence"]})')
-
-        if not ALERT_CHANNEL_ID:
-            return
-        channel = self.bot.get_channel(int(ALERT_CHANNEL_ID))
-        if not channel:
-            return
-        await channel.send(
-            f'**DRIFT DETECTED** - token may be in use by another process\n'
-            f'Action: `{event["actionType"]}`  Target: `{event["targetId"]}`  Guild: `{event["guildId"]}`\n'
-            f'Occurred: {event["occurredAt"]}\n'
-            f'Confidence: {report["confidence"]}\n'
-            f'Action: {report["suggestedRemediation"][0]}'
-        )
 
 
 class ParityBot(discord.Client):
@@ -65,13 +27,10 @@ class ParityBot(discord.Client):
         intents.message_content = True
         super().__init__(intents=intents)
 
-        self.dispatcher = AlertDispatcher(strategies=[])
         self.parity = None
 
     async def setup_hook(self):
-        strategy = ParityStrategy(self)
-        self.dispatcher = AlertDispatcher(strategies=[strategy])
-        self.parity = await attach(self, dispatcher=self.dispatcher)
+        self.parity = await attach(self, alert_channel_id=ALERT_CHANNEL_ID, alert_user_id=ALERT_USER_ID)
 
     async def on_ready(self):
         print(f'Logged in as {self.user} (id={self.user.id})')
@@ -88,7 +47,7 @@ class ParityBot(discord.Client):
 
         if sub == 'status':
             await message.reply(
-                f'Parity v1.1.0 is active.\n'
+                f'Parity v1.3.0 is active.\n'
                 f'Monitoring guild {message.guild.name}.\n'
                 f'Alert channel: {f"<#{ALERT_CHANNEL_ID}>" if ALERT_CHANNEL_ID else "not configured"}'
             )

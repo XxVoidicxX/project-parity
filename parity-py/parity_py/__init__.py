@@ -182,6 +182,29 @@ class AlertDispatcher:
     def __init__(self, strategies=()): self.strategies = strategies
     async def dispatch(self, report): await asyncio.gather(*(strategy.send(report) for strategy in self.strategies))
 
+def format_drift_alert(report, mention_user_id=None):
+    event = report['event']
+    prefix = '' if mention_user_id is None else f'<@{mention_user_id}> '
+    action = (report.get('suggestedRemediation') or ['Review this bot process and Discord audit log immediately.'])[0]
+    return (f'{prefix}Parity detected an action this bot process did not plan. The token may be in use elsewhere.\n'
+            f'Action: {event["actionType"]}\nTarget: {event["targetId"]}\nGuild: {event["guildId"]}\n'
+            f'Time: {event["occurredAt"]}\nConfidence: {report["confidence"]}\nDo now: {action}')[:2000]
+
+class DiscordChannelAlertStrategy:
+    def __init__(self, client, channel_id, mention_user_id=None, send_message=None):
+        if client is None: raise ValueError('DiscordChannelAlertStrategy requires a Discord client')
+        if channel_id is None or not str(channel_id).strip(): raise ValueError('DiscordChannelAlertStrategy requires an alert channel ID')
+        self.client, self.channel_id, self.mention_user_id, self.send_message = client, str(channel_id), None if mention_user_id is None else str(mention_user_id), send_message
+    async def send(self, report):
+        channel_id = int(self.channel_id)
+        channel = self.client.get_channel(channel_id) if callable(getattr(self.client, 'get_channel', None)) else None
+        if channel is None:
+            fetch = getattr(self.client, 'fetch_channel', None)
+            channel = await fetch(channel_id) if callable(fetch) else None
+        if not callable(getattr(channel, 'send', None)): raise ValueError('Parity alert channel must be a text channel')
+        content = format_drift_alert(report, self.mention_user_id)
+        return await self.send_message(channel, content) if self.send_message else await channel.send(content)
+
 class AuditListener:
     def __init__(self, client, reconciler, dispatcher, bot_user_id, wait_for_pending=None, clock=lambda: int(datetime.now().timestamp() * 1000), dedupe_ttl_ms=600000, on_event=None):
         self.client, self.reconciler, self.dispatcher, self.bot_user_id = client, reconciler, dispatcher, bot_user_id
@@ -320,7 +343,6 @@ def _discord_py_raw_entry_to_dict(entry):
 async def attach(client, **options):
     clock = options.get('clock', lambda: int(datetime.now().timestamp() * 1000))
     ledger = options.get('ledger') or Ledger(clock=clock)
-    dispatcher = options.get('dispatcher') or AlertDispatcher(options.get('strategies', ()))
     reconciler = options.get('reconciler') or Reconciler(ledger, clock=clock, tolerance_ms=options.get('tolerance_ms', 120000))
     journal = options.get('journal') or OperationJournal(options.get('journal_limit', 1000), clock)
     def project_entry(entry): return {key: entry[key] for key in ['correlationId', 'actionType', 'targetId', 'targetType', 'guildId'] if key in entry} | ({'count': entry['count']} if 'count' in entry else {})
@@ -345,6 +367,36 @@ async def attach(client, **options):
         snapshot = list(pending)
         if snapshot:
             await asyncio.wait(snapshot, timeout=options.get('pending_wait_ms', 5000) / 1000)
+    async def track(intent, operation):
+        if callable(intent):
+            marker = asyncio.get_running_loop().create_future()
+            pending.add(marker)
+            try:
+                result = operation()
+                if inspect.isawaitable(result):
+                    result = await result
+                entry = await record_intent(intent(result), 'track-result')
+                await observe({'phase': 'code-operation-succeeded', 'source': 'track-result', **project_entry(entry)})
+                return result
+            finally:
+                pending.discard(marker)
+                if not marker.done(): marker.set_result(None)
+        entry = await record_intent(intent, 'track-before')
+        try:
+            result = operation()
+            result = await result if inspect.isawaitable(result) else result
+            await observe({'phase': 'code-operation-succeeded', 'source': 'track-before', **project_entry(entry)})
+            return result
+        except BaseException:
+            await cancel_intent(entry, 'track-before')
+            raise
+    async def track_alert_message(channel, content):
+        guild_id = getattr(channel, 'guild_id', None) or getattr(getattr(channel, 'guild', None), 'id', None)
+        return await track(lambda message: {'actionType': 'MESSAGE_CREATE', 'targetId': str(message.id), 'targetType': 'message', 'guildId': str(guild_id or 'unknown')}, lambda: channel.send(content))
+    strategies = [*options.get('strategies', ())]
+    if options.get('alert_channel_id') is not None:
+        strategies.append(DiscordChannelAlertStrategy(client, options['alert_channel_id'], options.get('alert_user_id'), track_alert_message))
+    dispatcher = options.get('dispatcher') or AlertDispatcher(strategies)
     listener = AuditListener(client, reconciler, dispatcher, bot_user_id, wait_for_pending, clock, on_event=observe)
 
     if client is not None:
@@ -395,30 +447,6 @@ async def attach(client, **options):
                 if getattr(client, event_name, None) is not combined: continue
                 if existing is None: delattr(client, event_name)
                 else: setattr(client, event_name, existing)
-
-    async def track(intent, operation):
-        if callable(intent):
-            marker = asyncio.get_running_loop().create_future()
-            pending.add(marker)
-            try:
-                result = operation()
-                if inspect.isawaitable(result):
-                    result = await result
-                entry = await record_intent(intent(result), 'track-result')
-                await observe({'phase': 'code-operation-succeeded', 'source': 'track-result', **project_entry(entry)})
-                return result
-            finally:
-                pending.discard(marker)
-                if not marker.done(): marker.set_result(None)
-        entry = await record_intent(intent, 'track-before')
-        try:
-            result = operation()
-            result = await result if inspect.isawaitable(result) else result
-            await observe({'phase': 'code-operation-succeeded', 'source': 'track-before', **project_entry(entry)})
-            return result
-        except BaseException:
-            await cancel_intent(entry, 'track-before')
-            raise
 
     return {
         'ledger': ledger,

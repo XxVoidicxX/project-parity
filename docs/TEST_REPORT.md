@@ -1,6 +1,6 @@
 # Project Parity test report
 
-**Version reported: 1.2.0**
+**Version reported: 1.3.0**
 
 This release pass exercised both implementations beyond their basic contract cases. The focus was matching at timing boundaries, malformed or unmatched self-actions, collapsed audit bursts, retention behavior, and serialized reconciliation under concurrent calls. The random scenarios use fixed seeds and injected clocks, so a failure should be reproducible rather than dependent on wall-clock timing.
 
@@ -8,14 +8,14 @@ This release pass exercised both implementations beyond their basic contract cas
 
 | Suite | Scope | Count | Result |
 | --- | --- | ---: | --- |
-| Root specification and cross-language tests | Schemas, rules, 8 byte-identical report fixtures, target extraction fixtures, generated maps, discord.js enum, byte-identical journal records | 8 | Pass |
-| JavaScript unit and stress tests | Core behavior, attach/track/auto-wrap coverage, lifecycle journal, counted bulk deletes, seeded fuzzing, 10,000-entry burst, 1,000 concurrent reconciliations | 24 | Pass |
-| Python unit and stress tests | Core behavior, both registration paths, lifecycle journal, target extraction, counted bulk deletes, generated-ID race, fuzzing and stress | 21 | Pass |
+| Root specification and cross-language tests | Schemas, rules, 8 byte-identical report fixtures, target extraction fixtures, generated maps, discord.js enum, byte-identical journal and owner-alert records | 9 | Pass |
+| JavaScript unit and stress tests | Core behavior, attach/track/auto-wrap coverage, lifecycle journal, private owner alerts, counted bulk deletes, seeded fuzzing, 10,000-entry burst, 1,000 concurrent reconciliations | 25 | Pass |
+| Python unit and stress tests | Core behavior, both registration paths, lifecycle journal, private owner alerts, target extraction, counted bulk deletes, generated-ID race, fuzzing and stress | 22 | Pass |
 | JavaScript live matrix | Disposable channels, roles, webhook, self-messages, manual and wrapped reconciliation | 14 | Pass |
 | Python live matrix | py-cord 2.6.1, disposable channel and self-messages | 5 | Pass |
-| JavaScript live target matrix | Disposable webhook messages, audit target inspection, exact bulk-delete count, lifecycle correlation, cleanup verification | 6 | Pass |
+| JavaScript live target matrix | Disposable owner alert, webhook messages, audit target inspection, exact bulk-delete count, lifecycle correlation, cleanup verification | 7 | Pass |
 
-The root `npm test` command runs all **53** checks: 8 specification/cross-language, 24 JavaScript, and 21 Python.
+The root `npm test` command runs all **56** checks: 9 specification/cross-language, 25 JavaScript, and 22 Python.
 
 ## Benchmark method
 
@@ -66,6 +66,12 @@ npm run live-test:targets
 ```
 
 The live commands skip successfully when credentials are absent. For an operator-run tenant check, use an isolated Python environment containing only `discord.py` (not py-cord in the same environment), follow [setup instructions](setup.md#live-discord-check), set the token only in the environment or ignored `.env`, and provide `PARITY_GUILD_ID`.
+
+---
+
+## Version 1.3.0 owner alerts
+
+JavaScript `attach()` accepts `alertChannelId` and `alertUserId`; Python accepts `alert_channel_id` and `alert_user_id`. When configured, Parity posts a short incident message to that private Discord channel and optionally mentions its owner. The message is intentionally non-technical: it says that the process did not plan the action, identifies the action/target/guild/time/confidence, and gives the immediate containment step. Tests exercise the real `attach()` path in both languages and assert identical message bytes across runtimes. The 2026-08-29 disposable target run passed **7/7**, including real owner-alert delivery and verification that the alert message reconciled once without looping.
 
 ---
 

@@ -23,6 +23,7 @@ const { attach } = await import('../parity-js/src/index.js');
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildModeration, GatewayIntentBits.GuildMessages] });
 const drifts = [];
 const audits = [];
+const ownerAlerts = [];
 const created = { channel: null, webhook: null };
 const results = [];
 let parity;
@@ -56,6 +57,10 @@ client.on('guildAuditLogEntryCreate', (entry, guild) => {
     count: Number(entry.extra?.count ?? 1),
   });
 });
+client.on('messageCreate', message => {
+  if (String(message.channelId) !== String(created.channel?.id) || String(message.author?.id) !== String(client.user?.id)) return;
+  if (message.content?.startsWith('Parity detected an action this bot process did not plan.')) ownerAlerts.push(message);
+});
 
 async function cleanup() {
   const failures = [];
@@ -78,7 +83,15 @@ client.once(Events.ClientReady, async () => {
 
     created.channel = await guild.channels.create({ name: `parity-target-${suffix()}`, type: ChannelType.GuildText, reason: 'parity target test setup' });
     created.webhook = await created.channel.createWebhook({ name: `parity-target-${suffix()}`, reason: 'parity target test setup' });
-    parity = attach(client, { strategies: [{ send: async report => drifts.push(report) }] });
+    parity = attach(client, { strategies: [{ send: async report => drifts.push(report) }], alertChannelId: created.channel.id });
+
+    const alertStart = ownerAlerts.length;
+    const alertJournalStart = parity.journal.entries().length;
+    await created.channel.setTopic('parity owner alert test', 'parity target test owner alert');
+    const ownerAlert = await waitFor(index => ownerAlerts.slice(index)[0], 15000, alertStart);
+    await wait(1000);
+    const alertMatched = parity.journal.entries().slice(alertJournalStart).some(record => record.phase === 'discord-matched' && record.transport === 'message' && record.event.targetId === String(ownerAlert?.id));
+    record('owner alert is delivered once and reconciles itself', !!ownerAlert && alertMatched && ownerAlerts.slice(alertStart).length === 1, ownerAlert ? `message=${ownerAlert.id}` : 'no owner alert message');
 
     const messageStart = drifts.length;
     const messageAuditStart = audits.length;

@@ -1,9 +1,9 @@
-import { AlertDispatcher } from './alerts.js';
+import { AlertDispatcher, DiscordChannelAlertStrategy } from './alerts.js';
 import { AuditListener } from './audit-listener.js';
 import { Ledger, MemoryLedgerAdapter } from './ledger.js';
 import { OperationJournal } from './operation-journal.js';
 import { Reconciler } from './reconciler.js';
-export { AlertDispatcher, DirectMessageAlertStrategy, WebhookAlertStrategy } from './alerts.js';
+export { AlertDispatcher, DirectMessageAlertStrategy, DiscordChannelAlertStrategy, WebhookAlertStrategy, formatDriftAlert } from './alerts.js';
 export { AuditListener } from './audit-listener.js';
 export { Ledger, MemoryLedgerAdapter } from './ledger.js';
 export { OperationJournal } from './operation-journal.js';
@@ -38,7 +38,6 @@ class PendingOperations {
 
 export function attach(client, options = {}) {
   const ledger = options.ledger ?? new Ledger(options);
-  const dispatcher = options.dispatcher ?? new AlertDispatcher(options.strategies);
   const reconciler = options.reconciler ?? new Reconciler({ ledger, clock: options.clock, toleranceMs: options.toleranceMs });
   const journal = options.journal ?? new OperationJournal({ limit: options.journalLimit, clock: options.clock });
   const projectEntry = entry => ({ correlationId: entry.correlationId, actionType: entry.actionType, targetId: entry.targetId, targetType: entry.targetType, guildId: entry.guildId, ...(entry.count === undefined ? {} : { count: entry.count }) });
@@ -47,6 +46,24 @@ export function attach(client, options = {}) {
   const cancelIntent = async (entry, source = 'track') => { await ledger.remove(entry.correlationId); await observe({ phase: 'code-operation-failed', source, ...projectEntry(entry), reason: 'operation-rejected' }); };
   const operationSucceeded = async (entry, source) => observe({ phase: 'code-operation-succeeded', source, ...projectEntry(entry) });
   const pending = new PendingOperations(options.pendingWaitMs);
+  const track = async (intent, operation) => {
+    if (typeof intent === 'function') return pending.run(operation, intent, recordIntent, operationSucceeded);
+    const entry = await recordIntent(intent, 'track-before');
+    try {
+      const result = await operation();
+      await operationSucceeded(entry, 'track-before');
+      return result;
+    } catch (error) {
+      await cancelIntent(entry, 'track-before');
+      throw error;
+    }
+  };
+  const trackAlertMessage = (channel, content) => track(
+    message => ({ actionType: 'MESSAGE_CREATE', targetId: String(message.id), targetType: 'message', guildId: String(channel.guildId ?? channel.guild?.id ?? 'unknown') }),
+    () => channel.send({ content }),
+  );
+  const strategies = [...(options.strategies ?? []), ...(options.alertChannelId == null ? [] : [new DiscordChannelAlertStrategy({ client, channelId: options.alertChannelId, mentionUserId: options.alertUserId, sendMessage: trackAlertMessage })])];
+  const dispatcher = options.dispatcher ?? new AlertDispatcher(strategies);
   const listener = new AuditListener({ client, reconciler, dispatcher, botUserId: options.botUserId, clock: options.clock, waitForPending: () => pending.wait(), onEvent: observe });
   listener.start();
   return {
@@ -57,20 +74,7 @@ export function attach(client, options = {}) {
     journal,
     intent: intent => recordIntent(intent),
     cancelIntent,
-    async track(intent, operation) {
-      if (typeof intent === 'function') {
-        return pending.run(operation, intent, recordIntent, operationSucceeded);
-      }
-      const entry = await recordIntent(intent, 'track-before');
-      try {
-        const result = await operation();
-        await operationSucceeded(entry, 'track-before');
-        return result;
-      } catch (error) {
-        await cancelIntent(entry, 'track-before');
-        throw error;
-      }
-    },
+    track,
     detach: () => listener.stop(),
   };
 }

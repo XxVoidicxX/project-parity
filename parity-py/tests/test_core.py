@@ -2,7 +2,7 @@ import asyncio
 import unittest
 from datetime import datetime, timezone
 
-from parity_py import attach, AlertDispatcher, AuditListener, Ledger, OperationJournal, Reconciler, SqliteLedgerAdapter, _discord_py_entry_to_dict, _target_type_for_action
+from parity_py import attach, AlertDispatcher, AuditListener, format_drift_alert, Ledger, OperationJournal, Reconciler, SqliteLedgerAdapter, _discord_py_entry_to_dict, _target_type_for_action
 
 NOW = 1786104000000
 
@@ -71,7 +71,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
             lambda resource: {'actionType': 'MESSAGE_CREATE', 'targetId': resource['id'], 'targetType': 'message', 'guildId': 'guild', 'correlationId': 'tracked-message'},
             generated_message,
         ))
-        await asyncio.sleep(0)
+        await asyncio.sleep(0.01)
         tracked_message = type('Message', (), {'id': 'tracked-message', 'author': actor, 'guild': guild, 'created_at': datetime.fromtimestamp(NOW / 1000, timezone.utc)})()
         gateway = asyncio.create_task(client.listeners['on_message'](tracked_message))
         gate.set()
@@ -204,6 +204,35 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(reports), 2)
         self.assertEqual(reports[0]['event']['targetId'], 'rogue')
         self.assertEqual(reports[1]['event']['actionType'], 'MESSAGE_CREATE')
+
+    async def test_attach_can_alert_a_private_discord_channel_in_plain_incident_language(self):
+        class Channel:
+            def __init__(self, client): self.client, self.guild_id, self.messages = client, 'guild', []
+            async def send(self, message):
+                self.messages.append(message)
+                asyncio.create_task(self.client.parity['listener'].handle_message({'id': 'parity-alert-message', 'guildId': 'guild', 'author': {'id': 'bot'}, 'createdTimestamp': NOW}))
+                return type('Message', (), {'id': 'parity-alert-message'})()
+        class Client:
+            def __init__(self):
+                self.user = type('User', (), {'id': 'bot'})()
+                self.parity = None
+                self.channel = Channel(self)
+            def add_listener(self, handler, name): setattr(self, name, handler)
+            def remove_listener(self, handler, name):
+                if getattr(self, name, None) is handler: delattr(self, name)
+            def get_channel(self, channel_id): return self.channel if channel_id == 123 else None
+        client = Client()
+        parity = await attach(client, clock=lambda: NOW, alert_channel_id='123', alert_user_id='owner')
+        client.parity = parity
+        await parity['listener'].handle_audit(event(action=10, targetId='rogue', targetType='channel', auditEntryId='owner-alert'))
+        await asyncio.sleep(0)
+        self.assertRegex(client.channel.messages[0], r'^<@owner> Parity detected an action this bot process did not plan')
+        self.assertIn('Do now: Immediately rotate the bot token.', client.channel.messages[0])
+        self.assertEqual(len(client.channel.messages), 1)
+        self.assertTrue(any(record['phase'] == 'discord-matched' and record['event']['targetId'] == 'parity-alert-message' for record in parity['journal'].entries()))
+        report = (await parity['reconciler'].reconcile_detailed(event(targetId='another-rogue')))['report']
+        self.assertNotIn('{', format_drift_alert(report))
+        await parity['detach']()
 
     async def test_normalizes_live_discord_js_channel_audit_action_and_target_fields(self):
         listener = AuditListener(None, Reconciler(Ledger(clock=lambda: NOW), clock=lambda: NOW), AlertDispatcher(), lambda: 'bot')
