@@ -9,9 +9,11 @@ export class Ledger {
     if (/^UNKNOWN_/.test(actionType)) throw new Error('Unknown audit actions cannot be ledgered until they are mapped');
     const timestamp = iso(own('timestamp', this.clock()));
     const correlationId = String(own('correlationId', this.idFactory()));
+    const suppliedCount = own('count');
+    if (suppliedCount !== undefined && (!Number.isSafeInteger(suppliedCount) || suppliedCount < 1 || suppliedCount > 10000)) throw new Error('Intent count must be an integer from 1 through 10000');
     const duplicate = this.adapter.has ? await this.adapter.has(correlationId) : (await this.entries()).some(entry => entry.correlationId === correlationId);
     if (duplicate) throw new Error(`Duplicate correlationId: ${correlationId}`);
-    const entry = { actionType, targetId: String(own('targetId')), targetType: String(own('targetType', 'unknown')), guildId: String(own('guildId')), timestamp, correlationId, expiresAt: iso(own('expiresAt', new Date(timestamp).getTime() + this.ttlMs)), ...(Object.prototype.hasOwnProperty.call(intent, 'metadata') ? { metadata: structuredClone(intent.metadata) } : {}) };
+    const entry = { actionType, targetId: String(own('targetId')), targetType: String(own('targetType', 'unknown')), guildId: String(own('guildId')), timestamp, correlationId, expiresAt: iso(own('expiresAt', new Date(timestamp).getTime() + this.ttlMs)), ...(suppliedCount === undefined ? {} : { count: suppliedCount }), ...(Object.prototype.hasOwnProperty.call(intent, 'metadata') ? { metadata: structuredClone(intent.metadata) } : {}) };
     await this.adapter.insert(entry); return entry;
   }
   async entries() { return this.adapter.all(); }

@@ -4,6 +4,21 @@ All notable changes to this project are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-08-27
+
+### Added
+
+- A shared `target-extraction-fixtures.json` contract covers overwrite composites, member actions, message delete/bulk/pin, invite codes, voice status, and AutoMod targets; JavaScript and Python projections are asserted byte-for-byte.
+- Ledger intents may include an optional validated `count` from 1 through 10,000. One `MESSAGE_BULK_DELETE` call now reconciles only when its exact channel and message count match the audit entry.
+- JavaScript auto-wrap exposes `getAutoWrapCoverage()`, reports unsupported manager objects and observed known-unsupported mutations, accepts an `onUnsupportedCall` hook, and can explicitly wrap standalone managers such as `WebhookClient`.
+- A disposable `live-test:targets` harness verifies Discord bulk-delete count reconciliation and reports unaudited same-app single-message deletes as unavailable.
+
+### Fixed
+
+- Action-specific audit normalization no longer mistakes a deleted-message author for the message, a channel-overwrite channel for the overwritten entity, or a null pin target for a message ID. Targetless disconnect/prune events now have stable guild targets.
+- Auto-wrap now unregisters its `guildCreate` listener and restores original manager objects on detach.
+- Audit action 192 is named `VOICE_CHANNEL_STATUS_CREATE`, matching Discord's current audit-log table and discord.js 14.27.0. Documentation notes Discord's conflicting April 2026 changelog wording.
+
 ## [1.0.2] - 2026-08-27
 
 ### Fixed

@@ -6,7 +6,7 @@ export { AlertDispatcher, DirectMessageAlertStrategy, WebhookAlertStrategy } fro
 export { AuditListener } from './audit-listener.js';
 export { Ledger, MemoryLedgerAdapter } from './ledger.js';
 export { Reconciler } from './reconciler.js';
-export { attachAutoWrap } from './auto-wrap.js';
+export { attachAutoWrap, AUTO_WRAP_COVERAGE } from './auto-wrap.js';
 
 class PendingOperations {
   constructor(waitMs = 5000) { this.waitMs = waitMs; this.operations = new Set(); }

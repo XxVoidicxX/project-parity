@@ -1,0 +1,55 @@
+{
+  "description": "Canonical targets derived from Discord audit target_id plus options. Both runtimes must produce these projections.",
+  "cases": [
+    {
+      "name": "channel overwrite uses channel and overwritten entity",
+      "raw": {"action":14,"targetId":"channel-1","targetType":"Channel","extra":{"id":"role-1","type":"0"},"guildId":"guild-1","executorId":"bot","createdTimestamp":1786104000000},
+      "expected": {"actionType":"CHANNEL_OVERWRITE_UPDATE","targetId":"channel-1:role-1","targetType":"overwrite","count":1}
+    },
+    {
+      "name": "member kick keeps affected user",
+      "raw": {"action":20,"targetId":"user-1","targetType":"User","guildId":"guild-1","executorId":"bot","createdTimestamp":1786104000000},
+      "expected": {"actionType":"MEMBER_KICK","targetId":"user-1","targetType":"user","count":1}
+    },
+    {
+      "name": "single message delete uses options channel not author target",
+      "raw": {"action":72,"targetId":"author-1","targetType":"Message","extra":{"channel":{"id":"channel-1"},"count":1},"guildId":"guild-1","executorId":"bot","createdTimestamp":1786104000000},
+      "expected": {"actionType":"MESSAGE_DELETE","targetId":"channel-1","targetType":"channel","count":1}
+    },
+    {
+      "name": "bulk message delete uses channel target and message count",
+      "raw": {"action":73,"targetId":"channel-1","targetType":"Message","extra":{"count":3},"guildId":"guild-1","executorId":"bot","createdTimestamp":1786104000000},
+      "expected": {"actionType":"MESSAGE_BULK_DELETE","targetId":"channel-1","targetType":"channel","count":3}
+    },
+    {
+      "name": "message pin uses options message id",
+      "raw": {"action":74,"targetId":null,"targetType":"Message","extra":{"channel":{"id":"channel-1"},"messageId":"message-1"},"guildId":"guild-1","executorId":"bot","createdTimestamp":1786104000000},
+      "expected": {"actionType":"MESSAGE_PIN","targetId":"message-1","targetType":"message","count":1}
+    },
+    {
+      "name": "member move uses destination channel",
+      "raw": {"action":26,"targetId":null,"targetType":"User","extra":{"channel":{"id":"voice-1"},"count":2},"guildId":"guild-1","executorId":"bot","createdTimestamp":1786104000000},
+      "expected": {"actionType":"MEMBER_MOVE","targetId":"voice-1","targetType":"channel","count":2}
+    },
+    {
+      "name": "member disconnect falls back to guild because Discord omits a target",
+      "raw": {"action":27,"targetId":null,"targetType":"User","extra":{"count":2},"guildId":"guild-1","executorId":"bot","createdTimestamp":1786104000000},
+      "expected": {"actionType":"MEMBER_DISCONNECT","targetId":"guild-1","targetType":"guild","count":2}
+    },
+    {
+      "name": "invite delete uses code reconstructed by the library",
+      "raw": {"action":42,"targetId":null,"targetType":"Invite","target":{"code":"invite-code"},"guildId":"guild-1","executorId":"bot","createdTimestamp":1786104000000},
+      "expected": {"actionType":"INVITE_DELETE","targetId":"invite-code","targetType":"invite","count":1}
+    },
+    {
+      "name": "voice channel status uses options channel",
+      "raw": {"action":192,"targetId":null,"targetType":"Unknown","extra":{"channel":{"id":"voice-1"}},"guildId":"guild-1","executorId":"bot","createdTimestamp":1786104000000},
+      "expected": {"actionType":"VOICE_CHANNEL_STATUS_CREATE","targetId":"voice-1","targetType":"channel","count":1}
+    },
+    {
+      "name": "automod execution targets the affected user",
+      "raw": {"action":143,"targetId":"user-1","targetType":"User","extra":{"channel":{"id":"channel-1"}},"guildId":"guild-1","executorId":"bot","createdTimestamp":1786104000000},
+      "expected": {"actionType":"AUTO_MODERATION_BLOCK_MESSAGE","targetId":"user-1","targetType":"user","count":1}
+    }
+  ]
+}

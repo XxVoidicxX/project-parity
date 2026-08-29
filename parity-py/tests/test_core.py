@@ -2,7 +2,7 @@ import asyncio
 import unittest
 from datetime import datetime, timezone
 
-from parity_py import attach, AlertDispatcher, AuditListener, Ledger, Reconciler, SqliteLedgerAdapter, _target_type_for_action
+from parity_py import attach, AlertDispatcher, AuditListener, Ledger, Reconciler, SqliteLedgerAdapter, _discord_py_entry_to_dict, _target_type_for_action
 
 NOW = 1786104000000
 
@@ -19,12 +19,14 @@ class Collector:
 class Tests(unittest.IsolatedAsyncioTestCase):
     def test_action_derived_target_types_match_discord_js(self):
         expected = {
-            'CHANNEL_OVERWRITE_UPDATE': 'channel',
+            'CHANNEL_OVERWRITE_UPDATE': 'overwrite',
             'MEMBER_KICK': 'user',
             'APPLICATION_COMMAND_PERMISSION_UPDATE': 'applicationcommand',
             'AUTO_MODERATION_RULE_UPDATE': 'automoderation',
             'ONBOARDING_PROMPT_UPDATE': 'guildonboardingprompt',
-            'ONBOARDING_UPDATE': 'guildonboarding',
+            'ONBOARDING_UPDATE': 'guild',
+            'MESSAGE_BULK_DELETE': 'channel',
+            'MEMBER_DISCONNECT': 'guild',
         }
         self.assertEqual({action: _target_type_for_action(action) for action in expected}, expected)
 
@@ -110,6 +112,22 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         await ledger.purge(NOW + 240001)
         self.assertEqual(len(await ledger.entries()), 0)
 
+    async def test_bulk_message_delete_requires_one_exact_counted_intent(self):
+        ledger = Ledger(clock=lambda: NOW)
+        await ledger.record(intent(actionType='MESSAGE_BULK_DELETE', targetId='channel', targetType='channel', count=3))
+        self.assertIsNone(await Reconciler(ledger, clock=lambda: NOW).reconcile(event(actionType='MESSAGE_BULK_DELETE', targetId='channel', targetType='channel', count=3)))
+        ledger = Ledger(clock=lambda: NOW)
+        await ledger.record(intent(actionType='MESSAGE_BULK_DELETE', targetId='channel', targetType='channel', count=2))
+        report = await Reconciler(ledger, clock=lambda: NOW).reconcile(event(actionType='MESSAGE_BULK_DELETE', targetId='channel', targetType='channel', count=3))
+        self.assertEqual(report['ledger']['state'], 'partial')
+        self.assertEqual(len(await ledger.entries()), 1)
+        ledger = Ledger(clock=lambda: NOW)
+        await ledger.record(intent(actionType='MESSAGE_BULK_DELETE', targetId='channel', targetType='channel'))
+        report = await Reconciler(ledger, clock=lambda: NOW).reconcile(event(actionType='MESSAGE_BULK_DELETE', targetId='channel', targetType='channel', count=1))
+        self.assertEqual(report['kind'], 'drift')
+        with self.assertRaisesRegex(ValueError, 'Intent count'):
+            await ledger.record(intent(correlationId='bad-count', count=0))
+
     async def test_exact_match_at_inclusive_tolerance_boundary(self):
         ledger = Ledger(clock=lambda: NOW)
         await ledger.record(intent(timestamp=NOW - 120000))
@@ -138,7 +156,7 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((report['kind'], report['event']['count']), ('drift', 2))
 
     async def test_representative_action_coverage_reconciles_exactly(self):
-        actions = ['GUILD_UPDATE','CHANNEL_DELETE','CHANNEL_OVERWRITE_UPDATE','MEMBER_KICK','MEMBER_BAN_ADD','ROLE_UPDATE','INVITE_DELETE','WEBHOOK_CREATE','EMOJI_DELETE','STICKER_UPDATE','INTEGRATION_DELETE','STAGE_INSTANCE_CREATE','GUILD_SCHEDULED_EVENT_UPDATE','THREAD_DELETE','APPLICATION_COMMAND_PERMISSION_UPDATE','AUTO_MODERATION_RULE_CREATE','AUTO_MODERATION_QUARANTINE_USER','ONBOARDING_UPDATE','VOICE_CHANNEL_STATUS_UPDATE','SOUNDBOARD_SOUND_CREATE','MESSAGE_PIN']
+        actions = ['GUILD_UPDATE','CHANNEL_DELETE','CHANNEL_OVERWRITE_UPDATE','MEMBER_KICK','MEMBER_BAN_ADD','ROLE_UPDATE','INVITE_DELETE','WEBHOOK_CREATE','EMOJI_DELETE','STICKER_UPDATE','INTEGRATION_DELETE','STAGE_INSTANCE_CREATE','GUILD_SCHEDULED_EVENT_UPDATE','THREAD_DELETE','APPLICATION_COMMAND_PERMISSION_UPDATE','AUTO_MODERATION_RULE_CREATE','AUTO_MODERATION_QUARANTINE_USER','ONBOARDING_UPDATE','VOICE_CHANNEL_STATUS_CREATE','SOUNDBOARD_SOUND_CREATE','MESSAGE_PIN']
         for action_type in actions:
             ledger = Ledger(clock=lambda: NOW)
             await ledger.record(intent(actionType=action_type, correlationId=action_type))
@@ -160,6 +178,16 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         for action, expected in [(10, 'CHANNEL_CREATE'), (11, 'CHANNEL_UPDATE'), (12, 'CHANNEL_DELETE')]:
             normalized = listener.normalize_audit({'id':f'audit-{action}','action':action,'actionType':{10:'Create',11:'Update',12:'Delete'}[action],'targetId':'channel','targetType':'Channel','executorId':'bot','guildId':'guild','createdTimestamp':NOW})
             self.assertEqual((normalized['actionType'], normalized['targetType']), (expected, 'channel'))
+
+    def test_discord_py_high_level_options_survive_conversion(self):
+        action = type('Action', (), {'value': 14})()
+        actor = type('User', (), {'id': 'bot'})()
+        guild = type('Guild', (), {'id': 'guild'})()
+        channel = type('Channel', (), {'id': 'channel'})()
+        overwrite = type('Role', (), {'id': 'role', 'type': '0'})()
+        entry = type('Entry', (), {'id': 'audit', 'action': action, 'target': channel, 'user': actor, 'user_id': 'bot', 'guild': guild, 'created_at': datetime.fromtimestamp(NOW / 1000, timezone.utc), 'extra': overwrite})()
+        normalized = AuditListener.normalize_audit(_discord_py_entry_to_dict(entry))
+        self.assertEqual((normalized['targetId'], normalized['targetType']), ('channel:role', 'overwrite'))
 
     async def test_500_exact_entries_leave_no_ledger_entries(self):
         ledger = Ledger(clock=lambda: NOW)

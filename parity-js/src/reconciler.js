@@ -19,15 +19,28 @@ export class Reconciler {
     if (!countValid) return this.report(canonical, this.nearest(canonical, entries));
     const burst = collapsedActions.has(canonical.actionType) && canonical.count > 1;
     const eligible = entries.filter(entry => entry.guildId === canonical.guildId && entry.actionType === canonical.actionType && entry.targetType === canonical.targetType && time(entry.expiresAt) >= time(canonical.occurredAt) && Math.abs(time(entry.timestamp) - time(canonical.occurredAt)) <= this.toleranceMs);
+    if (canonical.actionType === 'MESSAGE_BULK_DELETE') {
+      const exact = eligible.filter(entry => entry.targetId === canonical.targetId && entry.count === canonical.count).sort((a, b) => time(a.timestamp) - time(b.timestamp) || a.correlationId.localeCompare(b.correlationId))[0];
+      if (exact) { await this.ledger.remove(exact.correlationId); return null; }
+      return this.report(canonical, this.nearest(canonical, entries));
+    }
     if (burst) return this.reconcileBurst(canonical, eligible, entries);
     const exact = eligible.filter(entry => entry.targetId === canonical.targetId).sort((a, b) => time(a.timestamp) - time(b.timestamp) || a.correlationId.localeCompare(b.correlationId))[0];
     if (exact) { await this.ledger.remove(exact.correlationId); return null; }
     return this.report(canonical, this.nearest(canonical, entries));
   }
   async reconcileBurst(event, eligible, entries) {
-    const selected = eligible.sort((a, b) => time(a.timestamp) - time(b.timestamp) || a.correlationId.localeCompare(b.correlationId)).slice(0, event.count);
+    const selected = [];
+    let units = 0;
+    for (const entry of eligible.sort((a, b) => time(a.timestamp) - time(b.timestamp) || a.correlationId.localeCompare(b.correlationId))) {
+      const entryUnits = entry.count ?? 1;
+      if (entryUnits > event.count - units) continue;
+      selected.push(entry);
+      units += entryUnits;
+      if (units === event.count) break;
+    }
     for (const entry of selected) await this.ledger.remove(entry.correlationId);
-    return selected.length >= event.count ? null : this.report(event, this.nearest(event, entries.filter(entry => !selected.some(selectedEntry => selectedEntry.correlationId === entry.correlationId))));
+    return units === event.count ? null : this.report(event, this.nearest(event, entries.filter(entry => !selected.some(selectedEntry => selectedEntry.correlationId === entry.correlationId))));
   }
   nearest(event, entries) {
     const candidates = entries.filter(entry => entry.guildId === event.guildId);

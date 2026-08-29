@@ -6,7 +6,9 @@ All IDs are decimal strings. Timestamps are UTC ISO-8601 strings with millisecon
 
 ## Exact matching
 
-Normalize an audit event to `actionType`, `targetId`, `targetType`, and `guildId`. An intent matches only when all four fields are exactly equal, the event occurs within tolerance, and the intent has not expired at the event time; both tolerance and expiry boundaries are inclusive. The oldest eligible exact intent is consumed. Each intent can reconcile one audit count unit. This rejects an action against a differently typed target rather than allowing an ID collision to mask drift.
+Normalize an audit event to `actionType`, `targetId`, `targetType`, and `guildId`. An intent matches only when all four fields are exactly equal, the event occurs within tolerance, and the intent has not expired at the event time; both tolerance and expiry boundaries are inclusive. The oldest eligible exact intent is consumed. An intent represents one audit count unit unless its optional integer `count` says otherwise. This rejects an action against a differently typed target rather than allowing an ID collision to mask drift.
+
+Target extraction is action-specific. `MESSAGE_DELETE` uses `options.channel_id` because Discord's `target_id` is the message author, not the deleted message. `MESSAGE_BULK_DELETE` uses the channel ID. Pin/unpin uses `options.message_id`. Channel overwrites use `<channel target_id>:<options.id>` and type `overwrite`, preventing the same role overwrite in two channels from colliding. Move uses the destination channel; targetless disconnect/prune and guild-level onboarding/home settings use the guild. Invite targets use the reconstructed invite code. These cases are executable cross-language contracts in `target-extraction-fixtures.json`.
 
 ## Partial and expired matches
 
@@ -15,6 +17,8 @@ If no exact entry exists, choose the nearest ledger entry in the same guild by a
 ## Collapsed audit entries
 
 Discord may collapse rapid `MEMBER_MOVE`, `MEMBER_DISCONNECT`, and `MESSAGE_DELETE` actions into one audit entry with `count > 1`, sometimes with a target ID that represents only one affected entity. For these action types, reconciliation consumes up to `count` same-guild, same-action eligible intents. If the number consumed is at least `count`, no drift is emitted. Otherwise one drift is emitted with the original count and a partial/none ledger state. A count of one follows ordinary exact matching. This intentionally favors detection over silently accepting an under-ledgered burst.
+
+`MESSAGE_BULK_DELETE` has different cardinality: one REST call intentionally deletes many messages. It reconciles only against one exact channel intent whose explicit `count` equals the audit count. A missing or mismatched count emits drift and does not consume the intent.
 
 ## Message sends
 

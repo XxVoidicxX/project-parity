@@ -100,7 +100,7 @@ client.on(Events.MessageCreate, async message => {
 
   if (sub === 'status') {
     await message.reply(
-      `Parity v1.0.2 is active.\n` +
+      `Parity v1.1.0 is active.\n` +
       `Monitoring guild ${message.guild.name}.\n` +
       `Alert channel: ${alertChannelId ? `<#${alertChannelId}>` : 'not configured'}`
     );

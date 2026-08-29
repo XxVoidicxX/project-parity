@@ -11,6 +11,25 @@ test('ledger contract has required interoperable fields', () => {
   const schema = read('ledger-entry.schema.json');
   assert.deepEqual(schema.required, ['actionType', 'targetId', 'targetType', 'guildId', 'timestamp', 'correlationId', 'expiresAt']);
   assert.equal(schema.additionalProperties, false);
+  assert.deepEqual(schema.properties.count, { type: 'integer', minimum: 1, maximum: 10000 });
+});
+
+test('canonical target extraction fixtures match in JavaScript and Python', async () => {
+  const { AuditListener } = await import('../parity-js/src/index.js');
+  const cases = read('target-extraction-fixtures.json').cases;
+  const project = event => Object.fromEntries(['actionType', 'targetId', 'targetType', 'count'].map(key => [key, event[key]]));
+  const listener = new AuditListener();
+  const js = cases.map(({ raw }) => project(listener.normalizeAudit(raw, { id: raw.guildId })));
+  const python = JSON.parse(execFileSync('python', ['-c', [
+    'import json,sys',
+    'sys.path.insert(0,"parity-py")',
+    'from parity_py import AuditListener',
+    'cases=json.load(sys.stdin)["cases"]',
+    'keys=("actionType","targetId","targetType","count")',
+    'print(json.dumps([{k:v for k,v in AuditListener.normalize_audit(case["raw"]).items() if k in keys} for case in cases]))',
+  ].join(';')], { cwd: root, input: JSON.stringify({ cases }), encoding: 'utf8' }));
+  assert.deepEqual(js, cases.map(({ expected }) => expected));
+  assert.deepEqual(python, js);
 });
 
 test('drift contract has stable report envelope', () => {
@@ -46,9 +65,6 @@ test('canonical action map matches the installed discord.js audit event enum', a
   const runtimeMap = Object.fromEntries(Object.entries(AuditLogEvent)
     .filter(([, code]) => Number.isInteger(code))
     .map(([name, code]) => [String(code), canonical(name)]));
-  // discord.js 14.27.0 still calls code 192 VoiceChannelStatusCreate; Discord's
-  // current API table and changelog call the same code VOICE_CHANNEL_STATUS_UPDATE.
-  if (runtimeMap['192'] === 'VOICE_CHANNEL_STATUS_CREATE') runtimeMap['192'] = 'VOICE_CHANNEL_STATUS_UPDATE';
   assert.deepEqual(specMap, runtimeMap);
 });
 

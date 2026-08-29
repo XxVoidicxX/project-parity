@@ -1,6 +1,6 @@
 # Project Parity test report
 
-**Version reported: 1.0.2**
+**Version reported: 1.1.0**
 
 This release pass exercised both implementations beyond their basic contract cases. The focus was matching at timing boundaries, malformed or unmatched self-actions, collapsed audit bursts, retention behavior, and serialized reconciliation under concurrent calls. The random scenarios use fixed seeds and injected clocks, so a failure should be reproducible rather than dependent on wall-clock timing.
 
@@ -8,13 +8,14 @@ This release pass exercised both implementations beyond their basic contract cas
 
 | Suite | Scope | Count | Result |
 | --- | --- | ---: | --- |
-| Root specification and cross-language tests | Schemas, rules, 8 byte-identical fixtures, generated maps, discord.js enum | 6 | Pass |
-| JavaScript unit and stress tests | Core behavior, attach/track/auto-wrap, seeded fuzzing, 10,000-entry burst, 1,000 concurrent reconciliations | 21 | Pass |
-| Python unit and stress tests | Core behavior, both registration paths, target types, generated-ID race, fuzzing and stress | 17 | Pass |
+| Root specification and cross-language tests | Schemas, rules, 8 byte-identical report fixtures, target extraction fixtures, generated maps, discord.js enum | 7 | Pass |
+| JavaScript unit and stress tests | Core behavior, attach/track/auto-wrap coverage, counted bulk deletes, seeded fuzzing, 10,000-entry burst, 1,000 concurrent reconciliations | 22 | Pass |
+| Python unit and stress tests | Core behavior, both registration paths, target extraction, counted bulk deletes, generated-ID race, fuzzing and stress | 19 | Pass |
 | JavaScript live matrix | Disposable channels, roles, webhook, self-messages, manual and wrapped reconciliation | 14 | Pass |
 | Python live matrix | Isolated discord.py 2.5.2, disposable channel and self-messages | 5 | Pass |
+| JavaScript live target matrix | Disposable webhook messages, audit target inspection, exact bulk-delete count, cleanup verification | 5 | Pass |
 
-The root `npm test` command now runs all 27 JavaScript/spec/cross-language checks plus all 17 Python checks, so Python regressions can no longer be skipped by the default command.
+The root `npm test` command runs all **48** checks: 7 specification/cross-language, 22 JavaScript, and 19 Python.
 
 ## Benchmark method
 
@@ -61,9 +62,20 @@ npm test
 npm run benchmark
 npm run live-test
 npm run live-test:py
+npm run live-test:targets
 ```
 
 The live commands skip successfully when credentials are absent. For an operator-run tenant check, use an isolated Python environment containing only `discord.py` (not py-cord in the same environment), follow [setup instructions](setup.md#live-discord-check), set the token only in the environment or ignored `.env`, and provide `PARITY_GUILD_ID`.
+
+---
+
+## Version 1.1.0 target contract and coverage visibility
+
+The action-specific target pass was derived from Discord's current Audit Log Entry and Optional Audit Entry Info tables, then checked against discord.js 14.27.0 and isolated discord.py 2.5.2 object models. Ten shared cases assert identical JavaScript/Python projections for overwrites, kicks, message delete/bulk/pin, move/disconnect, invites, voice status, and AutoMod.
+
+This pass also found a cardinality bug: `MESSAGE_BULK_DELETE` reports the number of deleted messages, while the prior generic reconciler interpreted that number as requiring the same number of separate ledger entries. The ledger now accepts a validated optional `count`; one bulk intent must match both channel and count. Mismatches drift without consuming the intent.
+
+Auto-wrap coverage is inspectable at runtime. Tests verify wrapped and unsupported manager reporting, known-unsupported mutation observations, cleanup of rejected operations, `guildCreate` listener removal, and original-manager restoration on detach. The disposable target harness passed 5/5 on 2026-08-29: Discord delivered `MESSAGE_BULK_DELETE` with `count=2`, the counted channel intent reconciled, and cleanup verified that its webhook and channel were removed. Discord did not audit deletion of a same-app webhook message, so single-message delete remains explicitly unavailable without a second identity or a human-authored fixture. Member moderation, real collapsed bursts, overwrites, and pins still need live fixtures.
 
 ---
 
@@ -78,7 +90,7 @@ The original comprehensive harness reported 7/9, but two assertions were invalid
 - Cleanup: all temporary `parity-test-*` and `parity-py-test-*` channels, roles, and webhooks were deleted.
 - Environment finding: the host's global Python environment contained both discord.py and py-cord in the same `discord` namespace; it was rejected as an integration-test environment rather than used as evidence.
 
-The canonical action map was also corrected against Discord's current audit-log table and discord.js 14.27.0. Code 192 remains named `VOICE_CHANNEL_STATUS_UPDATE` per Discord's official documentation even though discord.js 14.27.0 exposes the legacy/mismatched enum name `VoiceChannelStatusCreate`.
+The canonical action map was also corrected against Discord's audit-log table and discord.js 14.27.0. Version 1.1.0 later aligned code 192 to `VOICE_CHANNEL_STATUS_CREATE`, which now matches both the current table and discord.js; Discord's April 2026 changelog still describes the same code as “update.”
 
 ---
 

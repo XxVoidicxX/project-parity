@@ -1,15 +1,3 @@
-/**
- * Comprehensive live integration test for Project Parity.
- *
- * Run:
- *   $env:DISCORD_BOT_TOKEN = 'your-token'
- *   $env:PARITY_GUILD_ID   = 'your-guild-id'
- *   node tools/live-full-test.mjs
- *
- * The test creates only its own temporary resources (channels, roles, webhooks)
- * and deletes them before exiting. No existing server resources are touched.
- */
-
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -134,7 +122,6 @@ client.once(Events.ClientReady, async () => {
     const rawRoles = guild.roles;
     attachAutoWrap(client, parity);
 
-    // ---- SECTION 1: Channel tests (verifies 1.0.1 normalization fix) ----
     console.log('\n[1] Channel tests');
 
     let before = drifts.length;
@@ -144,13 +131,11 @@ client.once(Events.ClientReady, async () => {
     const createDrift = await actionDrift('CHANNEL_CREATE', chA.id, before);
     record('1a: unrecorded channel create is drift', !!createDrift, createDrift ? `actionType=${createDrift.event.actionType}` : 'no drift in 25s');
 
-    // 1b: Unrecorded update -> drift expected
     before = drifts.length;
     await rawChannels.edit(chA.id, { topic: 'rogue update', reason: 'parity live test' });
     const rogueUpdate = await actionDrift('CHANNEL_UPDATE', chA.id, before);
     record('1b: unrecorded channel update is drift', !!rogueUpdate, rogueUpdate ? `actionType=${rogueUpdate.event.actionType}` : 'no drift in 25s');
 
-    // 1c: Manual intent with canonical shape reconciles.
     before = drifts.length;
     const chB = await rawChannels.create({ name: `parity-test-${ts()}`, type: ChannelType.GuildText, topic: 'parity init', reason: 'parity live test' });
     created.channels.push(chB);
@@ -161,7 +146,6 @@ client.once(Events.ClientReady, async () => {
     const falseDrift = await actionDrift('CHANNEL_UPDATE', chB.id, beforeB, 12000);
     record('1c: manual CHANNEL_UPDATE intent reconciles', !falseDrift, falseDrift ? 'FALSE POSITIVE' : 'reconciled cleanly');
 
-    // 1d/1e: Auto-wrap derives the created ID after the REST response and wraps manager edits.
     before = drifts.length;
     const chC = await guild.channels.create({ name: `parity-test-${ts()}`, type: ChannelType.GuildText, topic: 'auto-wrap init', reason: 'parity live test' });
     created.channels.push(chC);
@@ -172,7 +156,6 @@ client.once(Events.ClientReady, async () => {
     const wrappedUpdateDrift = await actionDrift('CHANNEL_UPDATE', chC.id, before, 12000);
     record('1e: auto-wrapped channel update reconciles', !wrappedUpdateDrift, wrappedUpdateDrift ? 'FALSE POSITIVE' : 'reconciled cleanly');
 
-    // ---- SECTION 2: Role tests ----
     console.log('\n[2] Role tests');
 
     if (perms.ManageRoles) {
@@ -182,13 +165,11 @@ client.once(Events.ClientReady, async () => {
       console.log(`  created role ${role.name} (${role.id})`);
       await actionDrift('ROLE_CREATE', role.id, before);
 
-      // 2a: Rogue role update -> drift
       const beforeRole = drifts.length;
       await rawRoles.edit(role.id, { name: `parity-test-${ts()}-updated`, reason: 'parity live test' });
       const roleDrift = await actionDrift('ROLE_UPDATE', role.id, beforeRole);
       record('2a: unrecorded role update is drift', !!roleDrift, roleDrift ? `actionType=${roleDrift.event.actionType}` : 'no drift in 25s');
 
-      // 2b: Recorded role update -> no drift
       before = drifts.length;
       const roleB = await rawRoles.create({ name: `parity-test-${ts()}`, reason: 'parity live test', permissions: [] });
       created.roles.push(roleB);
@@ -213,7 +194,6 @@ client.once(Events.ClientReady, async () => {
       record('2b: role tests', false, 'ManageRoles permission missing - skipped');
     }
 
-    // ---- SECTION 3: Webhook tests ----
     console.log('\n[3] Webhook tests');
 
     if (perms.ManageWebhooks) {
@@ -229,7 +209,6 @@ client.once(Events.ClientReady, async () => {
       record('3a: webhook tests', false, 'ManageWebhooks permission missing - skipped');
     }
 
-    // ---- SECTION 4: Self-message drift ----
     console.log('\n[4] Self-message test');
 
     if (perms.SendMessages) {
@@ -238,7 +217,6 @@ client.once(Events.ClientReady, async () => {
       const msgDrift = await actionDrift('MESSAGE_CREATE', rogueMessage.id, beforeMsg, 15000);
       record('4a: unrecorded self-message is drift', !!msgDrift, msgDrift ? `targetId=${msgDrift.event.targetId}` : 'no drift in 15s');
 
-      // 4b: Generated target IDs use result-derived track mode.
       const beforeTrackedMessage = drifts.length;
       const trackedMessage = await parity.track(
         message => ({ actionType: 'MESSAGE_CREATE', targetId: String(message.id), targetType: 'message', guildId: GUILD_ID }),
@@ -250,7 +228,6 @@ client.once(Events.ClientReady, async () => {
       record('4a/4b: self-message test', false, 'SendMessages permission missing - skipped');
     }
 
-    // ---- SECTION 5: Concurrent reconciliation ----
     console.log('\n[5] Concurrency test (offline)');
 
     const { Ledger, Reconciler } = await import('../parity-js/src/index.js');

@@ -88,7 +88,7 @@ class ParityBot(discord.Client):
 
         if sub == 'status':
             await message.reply(
-                f'Parity v1.0.2 is active.\n'
+                f'Parity v1.1.0 is active.\n'
                 f'Monitoring guild {message.guild.name}.\n'
                 f'Alert channel: {f"<#{ALERT_CHANNEL_ID}>" if ALERT_CHANNEL_ID else "not configured"}'
             )
