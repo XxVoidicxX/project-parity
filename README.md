@@ -73,7 +73,7 @@ The drift-report and ledger-entry schema versions are part of the public contrac
 
 ## Test coverage
 
-See the [Test report](TEST_REPORT.md) for the current suite map, bot-design coverage, live-test evidence, and known limits.
+See the [Test report](TEST_REPORT.md) for the current suite map, bot-design coverage, live-test evidence, and known limits. See [Commands](COMMANDS.md) for CLI arguments, doctor usage, and quick integration sheets.
 
 ## License
 

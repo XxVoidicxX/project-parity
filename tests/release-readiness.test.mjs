@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -13,7 +14,7 @@ test('README links to the test report', () => assert.match(readText('README.md')
 test('test report has a clear title', () => assert.match(report(), /^# Project Parity Test Report/m));
 test('test report includes the JavaScript category', () => assert.match(report(), /JavaScript \| 40/));
 test('test report includes the Python category', () => assert.match(report(), /Python \| 35/));
-test('test report includes the other category', () => assert.match(report(), /Other \(contract, cross-language, release\) \| 26/));
+test('test report includes the other category', () => assert.match(report(), /Other \(contract, cross-language, release\) \| 27/));
 test('test report includes a coverage map visual', () => assert.match(report(), /flowchart LR/));
 test('test report includes a reconciliation flow visual', () => assert.match(report(), /flowchart TD/));
 test('package versions are synchronized', () => {
@@ -50,4 +51,12 @@ test('repository hygiene excludes local credentials and runtime state', () => {
   const ignore = readText('.gitignore');
   assert.match(ignore, /^\.env$/m);
   assert.match(ignore, /^\.parity\/$/m);
+});
+test('command reference lists every command reported by both CLI implementations', () => {
+  const jsHelp = execFileSync('node', ['parity-js/bin/parity.mjs', 'help'], { cwd: root, encoding: 'utf8' });
+  const pythonHelp = execFileSync('python', ['-m', 'parity_py.cli', 'help'], { cwd: join(root, 'parity-py'), encoding: 'utf8' });
+  assert.equal(jsHelp.replace(/\r\n/g, '\n').trim(), pythonHelp.replace(/\r\n/g, '\n').trim());
+  const commands = ['help', 'init', 'status', 'check', 'health', 'logs', 'clear-logs', 'settings show', 'settings console', 'settings log-limit', 'reset'];
+  const reference = readText('COMMANDS.md');
+  for (const command of commands) assert.ok(reference.includes(`| \`parity ${command}\``), command);
 });

@@ -8,7 +8,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
-- A 101-test categorized local suite and a linked test report covering JavaScript, Python, contracts, release readiness, bot designs, live-test evidence, and known limits.
+- A 102-test categorized local suite and a linked test report covering JavaScript, Python, contracts, release readiness, bot designs, live-test evidence, and known limits.
+- `COMMANDS.md` with every runtime CLI command, arguments, doctor invocation, troubleshooting guidance, and copy-ready JavaScript and Python integration sheets.
 
 ### Fixed
 
