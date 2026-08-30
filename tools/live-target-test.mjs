@@ -46,6 +46,7 @@ const waitFor = async (predicate, milliseconds = 25000, start = 0) => {
 const auditFor = (action, channelId, start) => waitFor(index => audits.slice(index).find(entry => entry.action === action && entry.channelId === String(channelId)), 25000, start);
 const driftFor = (actionType, targetId, start) => waitFor(index => drifts.slice(index).find(report => report.event.actionType === actionType && String(report.event.targetId) === String(targetId)), 12000, start);
 const journalFor = (correlationId, start) => waitFor(() => parity.journal.entries().slice(start).find(record => record.phase === 'discord-matched' && record.matchedCorrelationIds.includes(correlationId)), 12000, start);
+const textDisplays = message => (message.components ?? []).flatMap(component => component.components ?? []).filter(component => component.type === 10).map(component => component.content ?? '').join('\n');
 
 client.on('guildAuditLogEntryCreate', (entry, guild) => {
   if (String(guild.id) !== String(guildId)) return;
@@ -59,7 +60,7 @@ client.on('guildAuditLogEntryCreate', (entry, guild) => {
 });
 client.on('messageCreate', message => {
   if (String(message.channelId) !== String(created.channel?.id) || String(message.author?.id) !== String(client.user?.id)) return;
-  if (message.content?.startsWith('Parity detected an action this bot process did not plan.')) ownerAlerts.push(message);
+  if (textDisplays(message).includes('# Parity drift detected')) ownerAlerts.push(message);
 });
 
 async function cleanup() {
