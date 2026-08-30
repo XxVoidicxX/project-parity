@@ -41,7 +41,7 @@ class PendingOperations {
 }
 
 export function attach(client, options = {}) {
-  if (options.autoWrap !== undefined && options.autoWrap !== true && (typeof options.autoWrap !== 'object' || Array.isArray(options.autoWrap) || options.autoWrap === null)) throw new TypeError('autoWrap must be true or an options object');
+  if (options.autoWrap !== undefined && options.autoWrap !== true && options.autoWrap !== false && (typeof options.autoWrap !== 'object' || Array.isArray(options.autoWrap) || options.autoWrap === null)) throw new TypeError('autoWrap must be true, false, or an options object');
   const ledger = options.ledger ?? new Ledger(options);
   const reconciler = options.reconciler ?? new Reconciler({ ledger, clock: options.clock, toleranceMs: options.toleranceMs });
   const journal = options.journal ?? new OperationJournal({ limit: options.journalLimit, clock: options.clock });

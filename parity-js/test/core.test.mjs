@@ -179,7 +179,7 @@ test('attach autoWrap enables supported managers and records coverage gaps witho
 });
 test('attach rejects invalid autoWrap configuration before registering listeners', () => {
   const client = new EventEmitter();
-  assert.throws(() => attach(client, { clock, runtime: false, autoWrap: 'yes' }), /autoWrap must be true or an options object/);
+  assert.throws(() => attach(client, { clock, runtime: false, autoWrap: 'yes' }), /autoWrap must be true, false, or an options object/);
   assert.equal(client.listenerCount('guildAuditLogEntryCreate'), 0);
 });
 test('normalizes live discord.js channel audit action and target fields', () => { const listener = new AuditListener({ botUserId: () => 'bot' }); for (const [action, expected] of [[10, 'CHANNEL_CREATE'], [11, 'CHANNEL_UPDATE'], [12, 'CHANNEL_DELETE']]) { const normalized = listener.normalizeAudit({ id: `audit-${action}`, action, actionType: action === 10 ? 'Create' : action === 11 ? 'Update' : 'Delete', targetId: 'channel', targetType: 'Channel', executorId: 'bot', createdTimestamp: now }, { id: 'guild' }); assert.equal(normalized.actionType, expected); assert.equal(normalized.targetType, 'channel'); } });

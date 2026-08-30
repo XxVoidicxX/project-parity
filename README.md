@@ -1,6 +1,6 @@
 # Project Parity
 
-**Version: 1.7.0**
+**Version: 1.7.1**
 
 **Project Parity is a drift watchdog for Discord bots.** Bot tokens get leaked, reused, or run by unauthorized processes, and Discord does not tell the intended bot process when that happens.
 
@@ -70,6 +70,10 @@ Discord audit targets are action-specific. In particular, record `MESSAGE_DELETE
 Project Parity follows [Semantic Versioning](https://semver.org/). Patch releases contain fixes. Minor releases add backward-compatible features. Major releases contain breaking schema or contract changes.
 
 The drift-report and ledger-entry schema versions are part of the public contract. Any breaking change to either schema requires a major version bump. Update the root and JavaScript package versions, Python `pyproject.toml`, this version line, and `CHANGELOG.md` together for every release.
+
+## Test coverage
+
+See the [Test report](TEST_REPORT.md) for the current suite map, bot-design coverage, live-test evidence, and known limits.
 
 ## License
 

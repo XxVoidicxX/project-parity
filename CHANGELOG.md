@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows [Semantic Versioning](https://semver.org/).
 
+## [1.7.1] - 2026-08-29
+
+### Added
+
+- A 101-test categorized local suite and a linked test report covering JavaScript, Python, contracts, release readiness, bot designs, live-test evidence, and known limits.
+
+### Fixed
+
+- JavaScript `attach()` accepts `autoWrap: false` as an explicit disabled configuration.
+
 ## [1.7.0] - 2026-08-29
 
 ### Added
