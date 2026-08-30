@@ -53,8 +53,9 @@ export async function runOnboardingDoctor({ client, parity, guildId, alertChanne
   if (!sendTest || !inspection.ok) return inspection;
   const checks = [...inspection.checks];
   const add = (name, pass, detail) => checks.push({ name, pass, detail });
+  let testMessage = null;
   try {
-    const message = await parity.testOwnerAlert();
+    const message = testMessage = await parity.testOwnerAlert();
     const end = Date.now() + timeoutMs;
     let matched = false;
     while (Date.now() < end) {
@@ -66,5 +67,5 @@ export async function runOnboardingDoctor({ client, parity, guildId, alertChanne
   } catch (error) {
     add('Tracked test alert', false, error.message);
   }
-  return { ok: checks.every(check => check.pass), checks };
+  return { ok: checks.every(check => check.pass), checks, testMessage };
 }

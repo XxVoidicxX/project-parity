@@ -18,7 +18,7 @@ if (!token || !guildId) {
   process.exit(0);
 }
 
-const { ChannelType, Client, Events, GatewayIntentBits, PermissionFlagsBits } = await import('discord.js');
+const { ChannelType, Client, ComponentType, Events, GatewayIntentBits, MessageFlags, PermissionFlagsBits } = await import('discord.js');
 const { attach, runOnboardingDoctor } = await import('../parity-js/src/index.js');
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildModeration, GatewayIntentBits.GuildMessages] });
 const results = [];
@@ -52,6 +52,7 @@ client.once(Events.ClientReady, async () => {
     parity = attach(client, { alertChannelId: channel.id });
     const doctor = await runOnboardingDoctor({ client, parity, guildId, alertChannelId: channel.id, sendTest: true });
     for (const check of doctor.checks) record(check.name, check.pass, check.detail);
+    record('Components V2 alert card', doctor.testMessage?.flags?.has(MessageFlags.IsComponentsV2) && doctor.testMessage.components?.length === 1 && doctor.testMessage.components[0].type === ComponentType.Container, 'Expected a Components V2 Container with tracked text displays.');
   } catch (error) {
     record('live doctor completed', false, error.message);
   } finally {

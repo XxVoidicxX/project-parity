@@ -34,7 +34,7 @@ parity = await attach(
 2. Inspect the reported action in Discord's audit log and inspect active bot deployments.
 3. Preserve the alert and journal records for investigation.
 
-Parity tracks its own alert message as a deliberate self-message. Do not remove that behavior or add a second alert sender that bypasses Parity tracking, or a bot can alert about its own alert.
+Parity sends its own Components V2 Container alert and tracks that message as a deliberate self-message. Do not remove that behavior or add a second alert sender that bypasses Parity tracking, or a bot can alert about its own alert.
 
 ## Safety rules
 

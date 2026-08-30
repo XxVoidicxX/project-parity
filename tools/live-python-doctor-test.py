@@ -56,6 +56,11 @@ class DoctorClient(discord.Client):
             self.parity = await attach(self, alert_channel_id=str(self.channel.id))
             doctor = await run_onboarding_doctor(self, self.parity, GUILD_ID, str(self.channel.id), send_test=True)
             for check in doctor['checks']: self.record(check['name'], check['pass'], check['detail'])
+            message = doctor.get('test_message')
+            flags = getattr(getattr(message, 'flags', None), 'value', getattr(message, 'flags', 0))
+            components = getattr(message, 'components', ())
+            first_type = components[0].get('type') if components and isinstance(components[0], dict) else getattr(components[0], 'type', None) if components else None
+            self.record('Components V2 alert card', bool(flags & 32768) and len(components) == 1 and first_type == 17, 'Expected a Components V2 Container with tracked text displays.')
         except Exception as error:
             self.record('live Python doctor completed', False, f'{type(error).__name__}: {error}')
         finally:

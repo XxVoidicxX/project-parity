@@ -1,6 +1,6 @@
 # Project Parity
 
-**Version: 1.5.0**
+**Version: 1.6.0**
 
 **Project Parity is a drift watchdog for Discord bots.** Bot tokens get leaked, reused, or run by unauthorized processes, and Discord does not tell the intended bot process when that happens.
 
@@ -40,7 +40,7 @@ Every attached instance exposes a bounded `journal`. It records Parity-owned cod
 
 ## Get owner alerts
 
-Create a private `#parity-alerts` channel, store its ID in `PARITY_ALERT_CHANNEL_ID`, and pass it as `alertChannelId` above. Parity posts a plain-language warning there and can mention `PARITY_ALERT_USER_ID`. Its own alert message is tracked as a deliberate self-message, so alerts do not trigger an alert loop. This is the recommended default for developers, non-developers, and AI-built bots: the message says what Discord action appeared, when, how confident Parity is, and the first containment step. See [AGENTS.md](AGENTS.md) for an integration checklist coding agents must follow.
+Create a private `#parity-alerts` channel, store its ID in `PARITY_ALERT_CHANNEL_ID`, and pass it as `alertChannelId` above. Parity itself sends a structured Discord Components V2 incident card there and can mention `PARITY_ALERT_USER_ID`. It uses Discord’s required `IS_COMPONENTS_V2` flag with a Container and Text Displays, not a plain-text fallback. Its own alert message is tracked as a deliberate self-message, so alerts do not trigger an alert loop. This is the recommended default for developers, non-developers, and AI-built bots: the card says what Discord action appeared, when, how confident Parity is, and the first containment step. See [Discord’s Components V2 documentation](https://docs.discord.com/developers/components/using-message-components) and [AGENTS.md](AGENTS.md) for integration rules.
 
 ## Verify setup
 

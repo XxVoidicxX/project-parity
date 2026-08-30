@@ -2,7 +2,7 @@ import asyncio
 import unittest
 from datetime import datetime, timezone
 
-from parity_py import attach, AlertDispatcher, AuditListener, format_drift_alert, Ledger, OperationJournal, Reconciler, SqliteLedgerAdapter, _discord_py_entry_to_dict, _target_type_for_action
+from parity_py import attach, AlertDispatcher, AuditListener, build_drift_alert_components, format_drift_alert, Ledger, OperationJournal, Reconciler, send_components_v2, SqliteLedgerAdapter, _discord_py_entry_to_dict, _target_type_for_action
 
 NOW = 1786104000000
 
@@ -205,11 +205,11 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(reports[0]['event']['targetId'], 'rogue')
         self.assertEqual(reports[1]['event']['actionType'], 'MESSAGE_CREATE')
 
-    async def test_attach_can_alert_a_private_discord_channel_in_plain_incident_language(self):
+    async def test_attach_sends_and_reconciles_a_components_v2_owner_alert(self):
         class Channel:
             def __init__(self, client): self.client, self.guild_id, self.messages = client, 'guild', []
-            async def send(self, message):
-                self.messages.append(message)
+            async def send(self, **payload):
+                self.messages.append(payload)
                 asyncio.create_task(self.client.parity['listener'].handle_message({'id': 'parity-alert-message', 'guildId': 'guild', 'author': {'id': 'bot'}, 'createdTimestamp': NOW}))
                 return type('Message', (), {'id': 'parity-alert-message'})()
         class Client:
@@ -226,13 +226,33 @@ class Tests(unittest.IsolatedAsyncioTestCase):
         client.parity = parity
         await parity['listener'].handle_audit(event(action=10, targetId='rogue', targetType='channel', auditEntryId='owner-alert'))
         await asyncio.sleep(0)
-        self.assertRegex(client.channel.messages[0], r'^<@owner> Parity detected an action this bot process did not plan')
-        self.assertIn('Do now: Immediately rotate the bot token.', client.channel.messages[0])
+        self.assertEqual(client.channel.messages[0]['flags'], 32768)
+        self.assertEqual([component['type'] for component in client.channel.messages[0]['components']], [17])
+        self.assertEqual([component['type'] for component in client.channel.messages[0]['components'][0]['components']], [10, 14, 10])
+        self.assertRegex(client.channel.messages[0]['components'][0]['components'][0]['content'], r'^<@owner>\n# Parity drift detected')
+        self.assertIn('**Do now:** Immediately rotate the bot token.', client.channel.messages[0]['components'][0]['components'][2]['content'])
         self.assertEqual(len(client.channel.messages), 1)
         self.assertTrue(any(record['phase'] == 'discord-matched' and record['event']['targetId'] == 'parity-alert-message' for record in parity['journal'].entries()))
         report = (await parity['reconciler'].reconcile_detailed(event(targetId='another-rogue')))['report']
         self.assertNotIn('{', format_drift_alert(report))
+        self.assertEqual(build_drift_alert_components({'event': event(), 'confidence': 'high', 'suggestedRemediation': ['Rotate']})['flags'], 32768)
         await parity['detach']()
+
+    async def test_components_v2_sender_falls_back_to_raw_discord_message_create(self):
+        sent = {}
+        class Http:
+            async def request(self, route, json):
+                sent['json'] = json
+                return {'id': 'raw-v2-message', 'flags': 32768, 'components': json['components']}
+        class Channel:
+            id = 'channel'
+            _state = type('State', (), {'http': Http()})()
+            async def send(self, **payload): raise TypeError("Messageable.send() got an unexpected keyword argument 'flags'")
+        payload = build_drift_alert_components({'event': event(), 'confidence': 'high', 'suggestedRemediation': ['Rotate']})
+        message = await send_components_v2(Channel(), payload)
+        self.assertEqual(message.id, 'raw-v2-message')
+        self.assertEqual(message.flags, 32768)
+        self.assertEqual(sent['json'], payload)
 
     async def test_normalizes_live_discord_js_channel_audit_action_and_target_fields(self):
         listener = AuditListener(None, Reconciler(Ledger(clock=lambda: NOW), clock=lambda: NOW), AlertDispatcher(), lambda: 'bot')

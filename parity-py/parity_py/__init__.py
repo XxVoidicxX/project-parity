@@ -191,6 +191,29 @@ def format_drift_alert(report, mention_user_id=None):
             f'Action: {event["actionType"]}\nTarget: {event["targetId"]}\nGuild: {event["guildId"]}\n'
             f'Time: {event["occurredAt"]}\nConfidence: {report["confidence"]}\nDo now: {action}')[:2000]
 
+def build_drift_alert_components(report, mention_user_id=None):
+    event = report['event']
+    mention = '' if mention_user_id is None else f'<@{mention_user_id}>\n'
+    action = (report.get('suggestedRemediation') or ['Review this bot process and Discord audit log immediately.'])[0]
+    return {'flags': 32768, 'allowed_mentions': {'parse': []} if mention_user_id is None else {'users': [str(mention_user_id)]}, 'components': [{'type': 17, 'accent_color': 0xed4245, 'components': [{'type': 10, 'content': f'{mention}# Parity drift detected'}, {'type': 14, 'divider': True, 'spacing': 1}, {'type': 10, 'content': f'**Action:** {event["actionType"]}\n**Target:** {event["targetId"]}\n**Guild:** {event["guildId"]}\n**Time:** {event["occurredAt"]}\n**Confidence:** {report["confidence"]}\n\n**Do now:** {action}'}]}]}
+
+def build_notice_components(text):
+    if not isinstance(text, str) or not text.strip(): raise ValueError('Parity alert text must not be empty')
+    return {'flags': 32768, 'allowed_mentions': {'parse': []}, 'components': [{'type': 17, 'accent_color': 0x57f287, 'components': [{'type': 10, 'content': text}]}]}
+
+async def send_components_v2(channel, payload):
+    try:
+        return await channel.send(**payload)
+    except TypeError as error:
+        if 'flags' not in str(error): raise
+    try:
+        from discord.http import Route
+        state = channel._state
+        data = await state.http.request(Route('POST', '/channels/{channel_id}/messages', channel_id=channel.id), json=payload)
+        return type('ParitySentMessage', (), {'id': str(data['id']), 'flags': data.get('flags', 0), 'components': data.get('components', ())})()
+    except Exception as error:
+        raise RuntimeError(f'Components V2 delivery failed: {error}') from error
+
 class DiscordChannelAlertStrategy:
     def __init__(self, client, channel_id, mention_user_id=None, send_message=None):
         if client is None: raise ValueError('DiscordChannelAlertStrategy requires a Discord client')
@@ -204,12 +227,12 @@ class DiscordChannelAlertStrategy:
             channel = await fetch(channel_id) if callable(fetch) else None
         if not callable(getattr(channel, 'send', None)): raise ValueError('Parity alert channel must be a text channel')
         return channel
-    async def send_text(self, content):
+    async def send_payload(self, payload):
         channel = await self.channel()
-        if not isinstance(content, str) or not content.strip(): raise ValueError('Parity alert text must not be empty')
-        if len(content) > 2000: raise ValueError('Parity alert text must not exceed 2000 characters')
-        return await self.send_message(channel, content) if self.send_message else await channel.send(content)
-    async def send(self, report): return await self.send_text(format_drift_alert(report, self.mention_user_id))
+        if payload.get('flags') != 32768 or not payload.get('components'): raise ValueError('Parity alerts require a Components V2 payload')
+        return await self.send_message(channel, payload) if self.send_message else await send_components_v2(channel, payload)
+    async def send(self, report): return await self.send_payload(build_drift_alert_components(report, self.mention_user_id))
+    async def send_notice(self, text): return await self.send_payload(build_notice_components(text))
 
 class AuditListener:
     def __init__(self, client, reconciler, dispatcher, bot_user_id, wait_for_pending=None, clock=lambda: int(datetime.now().timestamp() * 1000), dedupe_ttl_ms=600000, on_event=None):
@@ -408,9 +431,9 @@ async def attach(client, **options):
         except BaseException:
             await cancel_intent(entry, 'track-before')
             raise
-    async def track_alert_message(channel, content):
+    async def track_alert_message(channel, payload):
         guild_id = getattr(channel, 'guild_id', None) or getattr(getattr(channel, 'guild', None), 'id', None)
-        return await track(lambda message: {'actionType': 'MESSAGE_CREATE', 'targetId': str(message.id), 'targetType': 'message', 'guildId': str(guild_id or 'unknown')}, lambda: channel.send(content))
+        return await track(lambda message: {'actionType': 'MESSAGE_CREATE', 'targetId': str(message.id), 'targetType': 'message', 'guildId': str(guild_id or 'unknown')}, lambda: send_components_v2(channel, payload))
     owner_alert = None if options.get('alert_channel_id') is None else DiscordChannelAlertStrategy(client, options['alert_channel_id'], options.get('alert_user_id'), track_alert_message)
     strategies = [*options.get('strategies', ()), *([owner_alert] if owner_alert else [])]
     dispatcher = options.get('dispatcher') or AlertDispatcher(strategies)
@@ -477,6 +500,6 @@ async def attach(client, **options):
         'intent': record_intent,
         'cancel_intent': cancel_intent,
         'track': track,
-        'test_owner_alert': (lambda: owner_alert.send_text('Parity onboarding test passed. This expected message confirms that private owner alerts are working.')) if owner_alert else None,
+        'test_owner_alert': (lambda: owner_alert.send_notice('Parity onboarding test passed. This expected message confirms that private owner alerts are working.')) if owner_alert else None,
         'detach': detach,
     }

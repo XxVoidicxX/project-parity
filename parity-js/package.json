@@ -1,2 +1,2 @@
-{"name":"@project-parity/js","version":"1.5.0","type":"module","main":"./src/index.js","exports":"./src/index.js","bin":{"parity":"./bin/parity.mjs","parity-doctor":"./bin/parity-doctor.mjs"},"peerDependencies":{"discord.js":"^14.0.0"},"scripts":{"test":"node --test test/*.test.mjs","doctor":"node bin/parity-doctor.mjs","cli":"node bin/parity.mjs"}}
+{"name":"@project-parity/js","version":"1.6.0","type":"module","main":"./src/index.js","exports":"./src/index.js","bin":{"parity":"./bin/parity.mjs","parity-doctor":"./bin/parity-doctor.mjs"},"peerDependencies":{"discord.js":"^14.0.0"},"scripts":{"test":"node --test test/*.test.mjs","doctor":"node bin/parity-doctor.mjs","cli":"node bin/parity.mjs"}}
 

@@ -56,8 +56,9 @@ async def run_onboarding_doctor(client, parity, guild_id, alert_channel_id, aler
     if not send_test or not inspection['ok']:
         return inspection
     checks = [*inspection['checks']]
+    test_message = None
     try:
-        message = await parity['test_owner_alert']()
+        message = test_message = await parity['test_owner_alert']()
         end = asyncio.get_running_loop().time() + timeout_ms / 1000
         matched = False
         while asyncio.get_running_loop().time() < end:
@@ -67,7 +68,7 @@ async def run_onboarding_doctor(client, parity, guild_id, alert_channel_id, aler
         checks.append({'name': 'Tracked test alert', 'pass': matched, 'detail': f'Test message {message.id} was delivered and reconciled.' if matched else 'The test message did not reconcile before the timeout.'})
     except Exception as error:
         checks.append({'name': 'Tracked test alert', 'pass': False, 'detail': str(error)})
-    return {'ok': all(check['pass'] for check in checks), 'checks': checks}
+    return {'ok': all(check['pass'] for check in checks), 'checks': checks, 'test_message': test_message}
 
 
 async def _main():

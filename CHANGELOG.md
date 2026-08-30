@@ -4,6 +4,17 @@ All notable changes to this project are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows [Semantic Versioning](https://semver.org/).
 
+## [1.6.0] - 2026-08-29
+
+### Changed
+
+- Built-in owner alerts and onboarding confirmations are now Discord Components V2 Container cards with the required `IS_COMPONENTS_V2` flag, Text Display content, and an explicit containment instruction.
+- Both runtimes preserve result-derived self-message tracking for the V2 card. Python uses its client’s normal V2 send path when available and a raw Discord Message Create fallback when the client library lacks V2 flag support.
+
+### Verified
+
+- Offline payload and raw-fallback tests pass in both runtimes. Disposable live JavaScript and Python doctors both passed 9/9, verifying the returned message’s V2 flag, Container shape, and reconciliation.
+
 ## [1.5.0] - 2026-08-29
 
 ### Added

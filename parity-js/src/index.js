@@ -4,7 +4,7 @@ import { Ledger, MemoryLedgerAdapter } from './ledger.js';
 import { OperationJournal } from './operation-journal.js';
 import { Reconciler } from './reconciler.js';
 import { RuntimeStore } from './runtime-store.js';
-export { AlertDispatcher, DirectMessageAlertStrategy, DiscordChannelAlertStrategy, WebhookAlertStrategy, formatDriftAlert } from './alerts.js';
+export { AlertDispatcher, DirectMessageAlertStrategy, DiscordChannelAlertStrategy, WebhookAlertStrategy, buildDriftAlertComponents, buildNoticeComponents, formatDriftAlert } from './alerts.js';
 export { AuditListener } from './audit-listener.js';
 export { Ledger, MemoryLedgerAdapter } from './ledger.js';
 export { OperationJournal } from './operation-journal.js';
@@ -67,9 +67,9 @@ export function attach(client, options = {}) {
       throw error;
     }
   };
-  const trackAlertMessage = (channel, content) => track(
+  const trackAlertMessage = (channel, payload) => track(
     message => ({ actionType: 'MESSAGE_CREATE', targetId: String(message.id), targetType: 'message', guildId: String(channel.guildId ?? channel.guild?.id ?? 'unknown') }),
-    () => channel.send({ content }),
+    () => channel.send(payload),
   );
   const ownerAlert = options.alertChannelId == null ? null : new DiscordChannelAlertStrategy({ client, channelId: options.alertChannelId, mentionUserId: options.alertUserId, sendMessage: trackAlertMessage });
   const strategies = [...(options.strategies ?? []), ...(ownerAlert ? [ownerAlert] : [])];
@@ -88,7 +88,7 @@ export function attach(client, options = {}) {
     track,
     testOwnerAlert: async () => {
       if (!ownerAlert) throw new Error('Configure alertChannelId before testing owner alerts');
-      return ownerAlert.sendText('Parity onboarding test passed. This expected message confirms that private owner alerts are working.');
+      return ownerAlert.sendNotice('Parity onboarding test passed. This expected message confirms that private owner alerts are working.');
     },
     detach: () => { listener.stop(); if (heartbeat) clearInterval(heartbeat); runtime?.stop(); },
   };

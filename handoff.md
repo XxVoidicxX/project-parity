@@ -1,10 +1,10 @@
 # Parity Local Inspection — Handoff
 
-**Commit:** `1.5.0` operator-CLI release | **Working pack:** `1.5.0` | **Date inspected/tested:** 2026-08-29
+**Commit:** `1.6.0` Components V2 alert release | **Working pack:** `1.6.0` | **Date inspected/tested:** 2026-08-29
 
 ## Architecture (confirmed from source)
 - `parity-spec/` is the contract: strict ledger/drift schemas, reconciliation rules, 8 report fixtures, 10 target-extraction cases, coverage table, and canonical 69-code audit map.
-- `parity-js/src/` provides `attach`, an onboarding doctor, in-flight result tracking, action-specific listener normalization, serialized reconciler, a bounded operation journal, pluggable memory/SQLite ledgers, private owner-channel alerts, and opt-in manager auto-wrap.
+- `parity-js/src/` provides `attach`, an onboarding doctor, in-flight result tracking, action-specific listener normalization, serialized reconciler, a bounded operation journal, pluggable memory/SQLite ledgers, private Components V2 owner-alert cards, and opt-in manager auto-wrap.
 - `parity-py/parity_py/` mirrors the core contract and ships the equivalent `parity-doctor` command; both languages accept one private Discord alert-channel option. Outbound Python actions remain manual.
 - Both runtimes write a bounded token-free `.parity/` runtime pack and expose `parity` commands for operator status, health, logs, and console-mode settings.
 - Ledger adapters are pluggable. Matching entries are consumed; the new memory-only journal preserves a bounded lifecycle trail but is not durable evidence storage. SQLite remains synchronous/reference-grade.
@@ -28,8 +28,8 @@
 8. **Onboarding validation:** `npm run doctor -- --send-test` or `parity-doctor --send-test` checks access, privacy, send permissions, owner visibility, and one tracked alert message before deployment.
 
 ## Test coverage reality check
-- Current automated total: **68/68** — root/spec/cross-language **9**, JS **31**, Python **28**. New doctor tests simulate a correct private developer-bot setup, a public alert channel, a missing send permission, and tracked test-alert reconciliation in both runtimes; CLI tests cover lifecycle state, bounded logs, console settings, stale health, operator commands, and attach/detach persistence.
-- Fresh 2026-08-29 live matrices: **JS 14/14**, **Python 5/5** on py-cord 2.6.1, target/correlation **7/7**, and onboarding doctor **8/8 in JavaScript plus 8/8 in Python**. Both doctors created and removed a disposable private channel; each test message reconciled without an alert loop. Same-app webhook single-message delete remains explicitly unavailable because Discord did not audit it.
+- Current automated total: **69/69** — root/spec/cross-language **9**, JS **31**, Python **29**. New doctor tests simulate a correct private developer-bot setup, a public alert channel, a missing send permission, and tracked test-alert reconciliation in both runtimes; CLI tests cover lifecycle state, bounded logs, console settings, stale health, operator commands, and attach/detach persistence. Components V2 tests assert the exact flag/container shape and Python’s raw fallback.
+- Fresh 2026-08-29 live matrices: **JS 14/14**, **Python 5/5** on py-cord 2.6.1, target/correlation **7/7**, and onboarding doctor **9/9 in JavaScript plus 9/9 in Python**. Both doctors created and removed a disposable private channel; each Components V2 Container test message reconciled without an alert loop. Same-app webhook single-message delete remains explicitly unavailable because Discord did not audit it.
 - New offline coverage: lifecycle correlation, matched correlation IDs, failure cleanup, journal retention, ignored external events, plus existing overwrite/member/message/options targets and auto-wrap coverage.
 - Still not live-tested: true Discord-collapsed bursts, overwrite/pin/bulk-delete/member moderation shapes, reconnect/replay, rate limits, all 69 actions, SQLite contention, and alert retry isolation.
 
