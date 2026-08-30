@@ -1,6 +1,6 @@
 # Setup
 
-Grant the bot `VIEW_AUDIT_LOG`, enable `GUILD_MODERATION` (`intents.moderation` in discord.py), and attach Parity after client construction. Persist the ledger with `SqliteLedgerAdapter` in production; the default memory adapter is intended for simple deployments and tests. Record target-known actions before the outbound call. For Discord-generated IDs, use result-derived `track`; JavaScript can additionally opt into `attachAutoWrap` for supported guild managers.
+Grant the bot `VIEW_AUDIT_LOG`, enable `GUILD_MODERATION` (`intents.moderation` in discord.py), and attach Parity after client construction. Persist the ledger with `SqliteLedgerAdapter` in production; the default memory adapter is intended for simple deployments and tests. Set JavaScript `autoWrap: true` to ledger supported guild-manager calls automatically. For unsupported JavaScript APIs and all Python outbound actions, record target-known actions before the outbound call; use result-derived `track` for Discord-generated IDs.
 
 ## Owner alerts
 
@@ -21,7 +21,7 @@ Discord's audit `target_id` is not always the object passed to the REST call. Us
 | `INVITE_*` | Invite code | `invite` | None |
 | `VOICE_CHANNEL_STATUS_*` | Channel ID | `channel` | None |
 
-JavaScript auto-wrap is deliberately partial. After `attachAutoWrap(client, parity)`, call `parity.getAutoWrapCoverage()` to inspect wrapped managers, unsupported manager objects, and observed calls to known unsupported mutations such as role/channel position updates or member pruning. Pass `onUnsupportedCall` to route those observations to application logging. Standalone `WebhookClient` instances can be wrapped explicitly with `parity.wrapManager(webhookClient, guildId)`. Python outbound calls remain manual in v1.3.
+JavaScript auto-wrap is deliberately partial. Set `autoWrap: true` in `attach(...)`, then call `parity.getAutoWrapCoverage()` to inspect wrapped managers, unsupported manager objects, and observed calls to known unsupported mutations such as role/channel position updates or member pruning. Those known calls are persisted as `auto-wrap-unsupported` journal/runtime records. Use `autoWrap: { onUnsupportedCall: call => ... }` to also route them into application logging. Standalone `WebhookClient` instances can be wrapped explicitly with `parity.wrapManager(webhookClient, guildId)`. Python outbound calls remain manual in v1.7.
 
 ## Live Discord check
 

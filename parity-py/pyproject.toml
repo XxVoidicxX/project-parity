@@ -1,6 +1,6 @@
 [project]
 name = "project-parity-py"
-version = "1.6.0"
+version = "1.7.0"
 requires-python = ">=3.10"
 [project.scripts]
 parity = "parity_py.cli:main"

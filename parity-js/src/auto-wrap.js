@@ -37,6 +37,13 @@ function pushUnique(list, item, key) {
   if (!list.some(existing => key(existing) === key(item))) list.push(item);
 }
 
+function reportUnsupported(options, observation) {
+  try {
+    const result = options.onUnsupportedCall?.({ ...observation });
+    if (result?.then) result.catch(() => {});
+  } catch {}
+}
+
 function wrapManager(manager, parityIntent, parityCancel, guildId, parityTrack, state, options = {}, slot = 'manual') {
   if (manager?.[WRAPPED_MANAGER]) return manager;
   const managerClass = manager?.constructor?.name ?? 'unknown';
@@ -57,7 +64,7 @@ function wrapManager(manager, parityIntent, parityCancel, guildId, parityTrack, 
         return function (...args) {
           const observation = { guildId, slot, managerClass, method: String(prop), observedAt: new Date().toISOString() };
           state.unsupportedCalls.push(observation);
-          options.onUnsupportedCall?.({ ...observation });
+          reportUnsupported(options, observation);
           return value.apply(target, args);
         };
       }

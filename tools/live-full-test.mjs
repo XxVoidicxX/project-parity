@@ -23,7 +23,7 @@ if (!TOKEN || !GUILD_ID) {
 }
 
 const { Client, GatewayIntentBits, ChannelType, Events, PermissionsBitField } = await import('discord.js');
-const { attach, attachAutoWrap } = await import('../parity-js/src/index.js');
+const { attach } = await import('../parity-js/src/index.js');
 
 const wait       = ms => new Promise(r => setTimeout(r, ms));
 const ts         = () => Date.now().toString().slice(-6);
@@ -117,10 +117,9 @@ client.once(Events.ClientReady, async () => {
     }
     record('required permissions', true, Object.entries(perms).map(([k, v]) => `${k}=${v}`).join(' '));
 
-    parity = attach(client, { strategies: [{ send: async r => { drifts.push(r); } }] });
     const rawChannels = guild.channels;
     const rawRoles = guild.roles;
-    attachAutoWrap(client, parity);
+    parity = attach(client, { autoWrap: true, strategies: [{ send: async r => { drifts.push(r); } }] });
 
     console.log('\n[1] Channel tests');
 

@@ -4,6 +4,21 @@ All notable changes to this project are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows [Semantic Versioning](https://semver.org/).
 
+## [1.7.0] - 2026-08-29
+
+### Added
+
+- JavaScript `attach()` accepts `autoWrap: true` or `autoWrap: { onUnsupportedCall }`, eliminating the separate wrapper setup call for supported channel, role, member, and ban manager operations.
+- Known unsupported auto-wrap mutations now produce bounded `auto-wrap-unsupported` journal and runtime records, while an optional callback can forward the same gap to application observability.
+
+### Verified
+
+- Unit tests cover one-option installation, generated-ID tracking, known-gap journaling, callback delivery, restoration on detach, and rejection of invalid auto-wrap configuration before listeners register.
+
+### Fixed
+
+- Root `npm test` now invokes the Python suite correctly.
+
 ## [1.6.0] - 2026-08-29
 
 ### Changed

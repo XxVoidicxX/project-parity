@@ -4,6 +4,7 @@ import { Ledger, MemoryLedgerAdapter } from './ledger.js';
 import { OperationJournal } from './operation-journal.js';
 import { Reconciler } from './reconciler.js';
 import { RuntimeStore } from './runtime-store.js';
+import { attachAutoWrap } from './auto-wrap.js';
 export { AlertDispatcher, DirectMessageAlertStrategy, DiscordChannelAlertStrategy, WebhookAlertStrategy, buildDriftAlertComponents, buildNoticeComponents, formatDriftAlert } from './alerts.js';
 export { AuditListener } from './audit-listener.js';
 export { Ledger, MemoryLedgerAdapter } from './ledger.js';
@@ -40,6 +41,7 @@ class PendingOperations {
 }
 
 export function attach(client, options = {}) {
+  if (options.autoWrap !== undefined && options.autoWrap !== true && (typeof options.autoWrap !== 'object' || Array.isArray(options.autoWrap) || options.autoWrap === null)) throw new TypeError('autoWrap must be true or an options object');
   const ledger = options.ledger ?? new Ledger(options);
   const reconciler = options.reconciler ?? new Reconciler({ ledger, clock: options.clock, toleranceMs: options.toleranceMs });
   const journal = options.journal ?? new OperationJournal({ limit: options.journalLimit, clock: options.clock });
@@ -76,7 +78,7 @@ export function attach(client, options = {}) {
   const dispatcher = options.dispatcher ?? new AlertDispatcher(strategies);
   const listener = new AuditListener({ client, reconciler, dispatcher, botUserId: options.botUserId, clock: options.clock, waitForPending: () => pending.wait(), onEvent: observe });
   listener.start();
-  return {
+  const parity = {
     ledger,
     reconciler,
     dispatcher,
@@ -92,6 +94,22 @@ export function attach(client, options = {}) {
     },
     detach: () => { listener.stop(); if (heartbeat) clearInterval(heartbeat); runtime?.stop(); },
   };
+  if (options.autoWrap) {
+    const autoWrapOptions = options.autoWrap === true ? {} : options.autoWrap;
+    const onUnsupportedCall = autoWrapOptions.onUnsupportedCall;
+    attachAutoWrap(client, parity, {
+      ...autoWrapOptions,
+      onUnsupportedCall: call => {
+        const recorded = observe({ phase: 'auto-wrap-unsupported', source: 'auto-wrap', call });
+        recorded.catch(() => {});
+        try {
+          const result = onUnsupportedCall?.(call);
+          if (result?.then) result.catch(() => {});
+        } catch {}
+      },
+    });
+  }
+  return parity;
 }
 import { SqliteLedgerAdapter } from './sqlite-ledger-adapter.js';
 export { SqliteLedgerAdapter } from './sqlite-ledger-adapter.js';

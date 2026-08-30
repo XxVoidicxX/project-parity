@@ -149,6 +149,39 @@ test('auto-wrap records real create IDs, records edits before the call, and clea
   assert.equal(client.listenerCount('guildCreate'), 1);
   parity.detach();
 });
+test('attach autoWrap enables supported managers and records coverage gaps without an extra setup call', async () => {
+  class GuildChannelManager {
+    async create() { return { id: 'created-channel' }; }
+    async setPositions() { return 'positions-updated'; }
+  }
+  const guild = { id: 'guild', roles: {}, channels: new GuildChannelManager(), members: {}, bans: {} };
+  const originalChannels = guild.channels;
+  const client = new EventEmitter();
+  client.guilds = { cache: new Map([['guild', guild]]) };
+  const unsupported = [];
+  const events = [];
+  const parity = attach(client, { clock, runtime: false, onEvent: record => events.push(record), autoWrap: { onUnsupportedCall: call => unsupported.push(call) } });
+  await guild.channels.create({ name: 'created' });
+  assert.equal(await guild.channels.setPositions([]), 'positions-updated');
+  const laterGuild = { id: 'later-guild', roles: {}, channels: new GuildChannelManager(), members: {}, bans: {} };
+  const laterOriginalChannels = laterGuild.channels;
+  client.emit('guildCreate', laterGuild);
+  await laterGuild.channels.create({ name: 'created-later' });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual((await parity.ledger.entries()).map(entry => [entry.actionType, entry.targetId, entry.guildId]), [['CHANNEL_CREATE', 'created-channel', 'guild'], ['CHANNEL_CREATE', 'created-channel', 'later-guild']]);
+  assert.deepEqual(unsupported.map(call => [call.managerClass, call.method]), [['GuildChannelManager', 'setPositions']]);
+  assert.deepEqual(parity.journal.entries().filter(record => record.phase === 'auto-wrap-unsupported').map(record => [record.source, record.call.method]), [['auto-wrap', 'setPositions']]);
+  assert.deepEqual(events.filter(record => record.phase === 'auto-wrap-unsupported').map(record => record.call.method), ['setPositions']);
+  assert.ok(parity.getAutoWrapCoverage().wrapped.some(item => item.managerClass === 'GuildChannelManager'));
+  parity.detach();
+  assert.equal(guild.channels, originalChannels);
+  assert.equal(laterGuild.channels, laterOriginalChannels);
+});
+test('attach rejects invalid autoWrap configuration before registering listeners', () => {
+  const client = new EventEmitter();
+  assert.throws(() => attach(client, { clock, runtime: false, autoWrap: 'yes' }), /autoWrap must be true or an options object/);
+  assert.equal(client.listenerCount('guildAuditLogEntryCreate'), 0);
+});
 test('normalizes live discord.js channel audit action and target fields', () => { const listener = new AuditListener({ botUserId: () => 'bot' }); for (const [action, expected] of [[10, 'CHANNEL_CREATE'], [11, 'CHANNEL_UPDATE'], [12, 'CHANNEL_DELETE']]) { const normalized = listener.normalizeAudit({ id: `audit-${action}`, action, actionType: action === 10 ? 'Create' : action === 11 ? 'Update' : 'Delete', targetId: 'channel', targetType: 'Channel', executorId: 'bot', createdTimestamp: now }, { id: 'guild' }); assert.equal(normalized.actionType, expected); assert.equal(normalized.targetType, 'channel'); } });
 test('500 concurrent exact audit entries leave no ledger memory', async () => { const ledger = new Ledger({ clock }); const reconciler = new Reconciler({ ledger, clock }); await Promise.all([...Array(500)].map((_, index) => ledger.record(intent({ targetId: String(index), correlationId: `load-${index}` })))); const results = await Promise.all([...Array(500)].map((_, index) => reconciler.reconcile(event({ targetId: String(index), auditEntryId: `audit-${index}` })))); assert.ok(results.every(result => result === null)); assert.equal((await ledger.entries()).length, 0); });
 
