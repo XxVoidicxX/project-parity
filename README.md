@@ -1,6 +1,6 @@
 # Project Parity
 
-**Version: 1.4.0**
+**Version: 1.5.0**
 
 **Project Parity is a drift watchdog for Discord bots.** Bot tokens get leaked, reused, or run by unauthorized processes, and Discord does not tell the intended bot process when that happens.
 
@@ -51,6 +51,19 @@ DISCORD_BOT_TOKEN=... PARITY_GUILD_ID=... PARITY_ALERT_CHANNEL_ID=... npm run do
 ```
 
 For Python, install the package and run `parity-doctor --send-test` with the same environment variables. A failed check states the permission or configuration to fix; do not continue into production with a public or unwritable alert channel.
+
+## Operate Parity
+
+Each attached bot writes a bounded local runtime pack to `.parity/`: settings, current status, and lifecycle logs. It never stores the bot token. Console output is **off by default**, so PM2 and normal bot logs stay quiet; lifecycle logs are still available through the CLI. Run these commands from the bot working directory, or set the same `PARITY_RUNTIME_DIR` for both the bot process and your shell.
+
+```sh
+npm run parity -- status
+npm run parity -- health
+npm run parity -- logs --drift
+npm run parity -- settings console drift
+```
+
+The installed JavaScript and Python packages expose the same `parity` command. `console off` is silent, `console drift` prints only drift incidents, and `console all` prints each Parity lifecycle event. Use `parity help` for `init`, `status`, `check`, `health`, `logs`, `clear-logs`, `settings`, and `reset`.
 
 Discord audit targets are action-specific. In particular, record `MESSAGE_DELETE` and `MESSAGE_BULK_DELETE` against the channel (`targetType: "channel"`); include the number of messages as `count` for a bulk delete. Permission-overwrite targets use `${channelId}:${roleOrMemberId}` with `targetType: "overwrite"`, while pin/unpin actions use the message ID. The complete contract is in [`parity-spec/action-type-coverage.md`](parity-spec/action-type-coverage.md).
 

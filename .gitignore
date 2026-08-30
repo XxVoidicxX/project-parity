@@ -5,3 +5,4 @@ __pycache__/
 *.token
 _codex_*.log
 live-test-report.json
+.parity/

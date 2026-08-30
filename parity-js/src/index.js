@@ -3,11 +3,13 @@ import { AuditListener } from './audit-listener.js';
 import { Ledger, MemoryLedgerAdapter } from './ledger.js';
 import { OperationJournal } from './operation-journal.js';
 import { Reconciler } from './reconciler.js';
+import { RuntimeStore } from './runtime-store.js';
 export { AlertDispatcher, DirectMessageAlertStrategy, DiscordChannelAlertStrategy, WebhookAlertStrategy, formatDriftAlert } from './alerts.js';
 export { AuditListener } from './audit-listener.js';
 export { Ledger, MemoryLedgerAdapter } from './ledger.js';
 export { OperationJournal } from './operation-journal.js';
 export { Reconciler } from './reconciler.js';
+export { RuntimeStore } from './runtime-store.js';
 export { inspectOnboarding, runOnboardingDoctor } from './doctor.js';
 export { attachAutoWrap, AUTO_WRAP_COVERAGE } from './auto-wrap.js';
 
@@ -41,8 +43,14 @@ export function attach(client, options = {}) {
   const ledger = options.ledger ?? new Ledger(options);
   const reconciler = options.reconciler ?? new Reconciler({ ledger, clock: options.clock, toleranceMs: options.toleranceMs });
   const journal = options.journal ?? new OperationJournal({ limit: options.journalLimit, clock: options.clock });
+  const runtime = options.runtime === false ? null : options.runtime ?? new RuntimeStore({ dir: options.runtimeDir });
+  if (runtime && options.console != null) runtime.setSettings({ console: options.console });
+  runtime?.start({ botUserId: client?.user?.id == null ? null : String(client.user.id) });
+  const heartbeatMs = options.runtimeHeartbeatMs ?? 30000;
+  const heartbeat = runtime && Number.isInteger(heartbeatMs) && heartbeatMs > 0 ? setInterval(() => runtime.heartbeat(), heartbeatMs) : null;
+  heartbeat?.unref?.();
   const projectEntry = entry => ({ correlationId: entry.correlationId, actionType: entry.actionType, targetId: entry.targetId, targetType: entry.targetType, guildId: entry.guildId, ...(entry.count === undefined ? {} : { count: entry.count }) });
-  const observe = async record => { const stored = journal.record(record); try { await options.onEvent?.(stored); } catch {} return stored; };
+  const observe = async record => { const stored = journal.record(record); runtime?.record(stored); try { await options.onEvent?.(stored); } catch {} return stored; };
   const recordIntent = async (intent, source = 'manual') => { const entry = await ledger.record(intent); await observe({ phase: 'code-intent-recorded', source, ...projectEntry(entry) }); return entry; };
   const cancelIntent = async (entry, source = 'track') => { await ledger.remove(entry.correlationId); await observe({ phase: 'code-operation-failed', source, ...projectEntry(entry), reason: 'operation-rejected' }); };
   const operationSucceeded = async (entry, source) => observe({ phase: 'code-operation-succeeded', source, ...projectEntry(entry) });
@@ -74,6 +82,7 @@ export function attach(client, options = {}) {
     dispatcher,
     listener,
     journal,
+    runtime,
     intent: intent => recordIntent(intent),
     cancelIntent,
     track,
@@ -81,7 +90,7 @@ export function attach(client, options = {}) {
       if (!ownerAlert) throw new Error('Configure alertChannelId before testing owner alerts');
       return ownerAlert.sendText('Parity onboarding test passed. This expected message confirms that private owner alerts are working.');
     },
-    detach: () => listener.stop(),
+    detach: () => { listener.stop(); if (heartbeat) clearInterval(heartbeat); runtime?.stop(); },
   };
 }
 import { SqliteLedgerAdapter } from './sqlite-ledger-adapter.js';

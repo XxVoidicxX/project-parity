@@ -5,6 +5,7 @@ import json
 import sqlite3
 import uuid
 from datetime import datetime, timezone
+from .runtime import RuntimeStore
 
 COLLAPSED = {'MEMBER_MOVE', 'MEMBER_DISCONNECT', 'MESSAGE_DELETE'}
 MAX_AUDIT_COUNT = 10000
@@ -350,9 +351,21 @@ async def attach(client, **options):
     ledger = options.get('ledger') or Ledger(clock=clock)
     reconciler = options.get('reconciler') or Reconciler(ledger, clock=clock, tolerance_ms=options.get('tolerance_ms', 120000))
     journal = options.get('journal') or OperationJournal(options.get('journal_limit', 1000), clock)
+    runtime = None if options.get('runtime') is False else options.get('runtime') or RuntimeStore(options.get('runtime_dir'))
+    if runtime and options.get('console') is not None: runtime.set_settings({'console': options['console']})
+    if runtime: runtime.start({'botUserId': None if getattr(getattr(client, 'user', None), 'id', None) is None else str(client.user.id)})
+    heartbeat_task = None
+    heartbeat_ms = options.get('runtime_heartbeat_ms', 30000)
+    if runtime and client is not None and callable(getattr(client, 'is_closed', None)) and isinstance(heartbeat_ms, int) and heartbeat_ms > 0:
+        async def heartbeat():
+            while True:
+                await asyncio.sleep(heartbeat_ms / 1000)
+                runtime.heartbeat()
+        heartbeat_task = asyncio.create_task(heartbeat())
     def project_entry(entry): return {key: entry[key] for key in ['correlationId', 'actionType', 'targetId', 'targetType', 'guildId'] if key in entry} | ({'count': entry['count']} if 'count' in entry else {})
     async def observe(record):
         stored = journal.record(record)
+        if runtime: runtime.record(stored)
         try:
             result = options.get('on_event', lambda value: None)(stored)
             if inspect.isawaitable(result): await result
@@ -443,6 +456,8 @@ async def attach(client, **options):
             listener._patched_handlers = patched
 
     async def detach():
+        if heartbeat_task: heartbeat_task.cancel()
+        if runtime: runtime.stop()
         if client is not None:
             if callable(getattr(client, 'remove_listener', None)):
                 for handler, event_name in getattr(listener, '_registered_handlers', ()):
@@ -458,6 +473,7 @@ async def attach(client, **options):
         'dispatcher': dispatcher,
         'listener': listener,
         'journal': journal,
+        'runtime': runtime,
         'intent': record_intent,
         'cancel_intent': cancel_intent,
         'track': track,

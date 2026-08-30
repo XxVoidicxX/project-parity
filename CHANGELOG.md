@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows [Semantic Versioning](https://semver.org/).
 
+## [1.5.0] - 2026-08-29
+
+### Added
+
+- `parity` CLI in JavaScript and Python with help, init, status, check, health, logs, clear-logs, settings, and reset commands.
+- Attached runtimes now keep bounded token-free local status and lifecycle logs under `.parity/`, with a heartbeat for meaningful process health checks.
+- Console output is configurable as `off`, `drift`, or `all`, defaults to quiet, and can be toggled at runtime for PM2 or terminal workflows.
+
 ## [1.4.0] - 2026-08-29
 
 ### Added
