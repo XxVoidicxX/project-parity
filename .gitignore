@@ -6,3 +6,6 @@ __pycache__/
 _codex_*.log
 live-test-report.json
 .parity/
+parity-py/build/
+parity-py/dist/
+parity-py/*.egg-info/

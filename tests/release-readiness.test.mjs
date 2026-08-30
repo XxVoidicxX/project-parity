@@ -14,7 +14,7 @@ test('README links to the test report', () => assert.match(readText('README.md')
 test('test report has a clear title', () => assert.match(report(), /^# Project Parity Test Report/m));
 test('test report includes the JavaScript category', () => assert.match(report(), /JavaScript \| 40/));
 test('test report includes the Python category', () => assert.match(report(), /Python \| 35/));
-test('test report includes the other category', () => assert.match(report(), /Other \(contract, cross-language, release\) \| 27/));
+test('test report includes the other category', () => assert.match(report(), /Other \(contract, cross-language, release\) \| 30/));
 test('test report includes a coverage map visual', () => assert.match(report(), /flowchart LR/));
 test('test report includes a reconciliation flow visual', () => assert.match(report(), /flowchart TD/));
 test('package versions are synchronized', () => {
@@ -59,4 +59,24 @@ test('command reference lists every command reported by both CLI implementations
   const commands = ['help', 'init', 'status', 'check', 'health', 'logs', 'clear-logs', 'settings show', 'settings console', 'settings log-limit', 'reset'];
   const reference = readText('COMMANDS.md');
   for (const command of commands) assert.ok(reference.includes(`| \`parity ${command}\``), command);
+});
+test('release verification accepts only the synchronized current tag', () => {
+  const version = readJson('package.json').version;
+  assert.doesNotThrow(() => execFileSync('node', ['tools/verify-release.mjs', `v${version}`], { cwd: root, stdio: 'pipe' }));
+  assert.throws(() => execFileSync('node', ['tools/verify-release.mjs', 'v0.0.0'], { cwd: root, stdio: 'pipe' }));
+});
+test('CI tests supported Node and Python versions and packages both distributions', () => {
+  const workflow = readText('.github/workflows/ci.yml');
+  assert.match(workflow, /node: \['22\.14\.0', '24\.x'\]/);
+  assert.match(workflow, /python: \['3\.10', '3\.13'\]/);
+  assert.match(workflow, /npm test/);
+  assert.match(workflow, /npm pack --workspace=@project-parity\/js --dry-run/);
+  assert.match(workflow, /python -m build parity-py/);
+});
+test('release workflow requires OIDC and publishes both package distributions', () => {
+  const workflow = readText('.github/workflows/release.yml');
+  assert.match(workflow, /id-token: write/);
+  assert.match(workflow, /npm publish --workspace=@project-parity\/js --access public/);
+  assert.match(workflow, /pypa\/gh-action-pypi-publish@release\/v1/);
+  assert.match(workflow, /tools\/verify-release\.mjs/);
 });

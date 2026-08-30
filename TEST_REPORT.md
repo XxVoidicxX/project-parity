@@ -5,13 +5,13 @@
 
 ## Coverage at a glance
 
-The local suite contains **102 tests** across three deliberately different categories. A category is not merely a language label: it exercises a different failure surface.
+The local suite contains **105 tests** across three deliberately different categories. A category is not merely a language label: it exercises a different failure surface.
 
 | Category | Tests | Primary purpose |
 | --- | ---: | --- |
 | JavaScript | 40 | discord.js attachment, manager auto-tracking, runtime/CLI, reconciliation |
 | Python | 35 | discord.py-style attachment, manual recording workflow, runtime/CLI, reconciliation |
-| Other (contract, cross-language, release) | 27 | shared schema, byte parity, documentation, packaging, repository hygiene |
+| Other (contract, cross-language, release) | 30 | shared schema, byte parity, documentation, packaging, repository hygiene |
 
 ```mermaid
 flowchart LR
@@ -50,7 +50,7 @@ The first visual shows independent runtime coverage converging on the shared con
 | `parity-py/tests/test_manual_workflows.py` | 6 | Explicit Python intent/track workflows, generated IDs, rejected calls, self-messages, guild isolation |
 | `tests/spec.test.mjs` | 6 | JSON schemas, canonical targets, reconciliation rules, installed discord.js action enum |
 | `tests/cross-language.test.mjs` | 3 | Byte-identical reports, journals, and owner-facing text across runtimes |
-| `tests/release-readiness.test.mjs` | 18 | Report/README linkage, command reference parity, release versions, schemas, fixtures, action-map uniqueness, setup guidance, live harness configuration, ignored credentials/runtime files |
+| `tests/release-readiness.test.mjs` | 21 | Report/README linkage, command and release parity, CI/release workflow requirements, release versions, schemas, fixtures, action-map uniqueness, setup guidance, live harness configuration, ignored credentials/runtime files |
 
 ## Different bot designs covered
 
@@ -74,7 +74,7 @@ Run the deterministic suite from the repository root:
 npm test
 ```
 
-This runs the 27 other tests, 40 JavaScript tests, and 35 Python tests. Python’s test runner emits occasional asyncio slow-task diagnostics on this machine during large concurrency cases; the suite still exits successfully and treats them as performance diagnostics, not assertions.
+This runs the 30 other tests, 40 JavaScript tests, and 35 Python tests. Python’s test runner emits occasional asyncio slow-task diagnostics on this machine during large concurrency cases; the suite still exits successfully and treats them as performance diagnostics, not assertions.
 
 The disposable live matrix is separate because it creates and removes Discord channels, roles, webhooks, and messages in a dedicated guild:
 

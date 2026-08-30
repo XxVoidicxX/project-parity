@@ -1,9 +1,26 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "project-parity-py"
+name = "project-parity"
 version = "1.7.1"
+description = "Drift watchdog for Discord bots using Python Discord clients."
+readme = "README.md"
+license = "FSL-1.1-ALv2"
+license-files = ["LICENSE.md"]
 requires-python = ">=3.10"
+authors = [{ name = "Project Parity contributors" }]
+keywords = ["discord", "security", "audit-log", "drift-detection"]
+[project.optional-dependencies]
+discord = ["discord.py>=2.5"]
+[project.urls]
+Homepage = "https://github.com/XxVoidicxX/project-parity"
+Repository = "https://github.com/XxVoidicxX/project-parity"
+Issues = "https://github.com/XxVoidicxX/project-parity/issues"
 [project.scripts]
 parity = "parity_py.cli:main"
 parity-doctor = "parity_py.doctor:main"
 [tool.setuptools.packages.find]
 where = ["."]
+include = ["parity_py*"]

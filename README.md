@@ -75,6 +75,10 @@ The drift-report and ledger-entry schema versions are part of the public contrac
 
 See the [Test report](TEST_REPORT.md) for the current suite map, bot-design coverage, live-test evidence, and known limits. See [Commands](COMMANDS.md) for CLI arguments, doctor usage, and quick integration sheets.
 
+## Publishing
+
+The repository contains CI and tag-only release workflows for npm and PyPI. Follow [Releasing](RELEASING.md) to configure trusted publishing before creating the first release tag.
+
 ## License
 
 Free to use, modify, embed, and sell products built with Parity; you may not resell Parity itself or a competing rebrand until the FSL change date. See [LICENSE.md](LICENSE.md).
