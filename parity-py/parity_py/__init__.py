@@ -195,15 +195,20 @@ class DiscordChannelAlertStrategy:
         if client is None: raise ValueError('DiscordChannelAlertStrategy requires a Discord client')
         if channel_id is None or not str(channel_id).strip(): raise ValueError('DiscordChannelAlertStrategy requires an alert channel ID')
         self.client, self.channel_id, self.mention_user_id, self.send_message = client, str(channel_id), None if mention_user_id is None else str(mention_user_id), send_message
-    async def send(self, report):
+    async def channel(self):
         channel_id = int(self.channel_id)
         channel = self.client.get_channel(channel_id) if callable(getattr(self.client, 'get_channel', None)) else None
         if channel is None:
             fetch = getattr(self.client, 'fetch_channel', None)
             channel = await fetch(channel_id) if callable(fetch) else None
         if not callable(getattr(channel, 'send', None)): raise ValueError('Parity alert channel must be a text channel')
-        content = format_drift_alert(report, self.mention_user_id)
+        return channel
+    async def send_text(self, content):
+        channel = await self.channel()
+        if not isinstance(content, str) or not content.strip(): raise ValueError('Parity alert text must not be empty')
+        if len(content) > 2000: raise ValueError('Parity alert text must not exceed 2000 characters')
         return await self.send_message(channel, content) if self.send_message else await channel.send(content)
+    async def send(self, report): return await self.send_text(format_drift_alert(report, self.mention_user_id))
 
 class AuditListener:
     def __init__(self, client, reconciler, dispatcher, bot_user_id, wait_for_pending=None, clock=lambda: int(datetime.now().timestamp() * 1000), dedupe_ttl_ms=600000, on_event=None):
@@ -393,9 +398,8 @@ async def attach(client, **options):
     async def track_alert_message(channel, content):
         guild_id = getattr(channel, 'guild_id', None) or getattr(getattr(channel, 'guild', None), 'id', None)
         return await track(lambda message: {'actionType': 'MESSAGE_CREATE', 'targetId': str(message.id), 'targetType': 'message', 'guildId': str(guild_id or 'unknown')}, lambda: channel.send(content))
-    strategies = [*options.get('strategies', ())]
-    if options.get('alert_channel_id') is not None:
-        strategies.append(DiscordChannelAlertStrategy(client, options['alert_channel_id'], options.get('alert_user_id'), track_alert_message))
+    owner_alert = None if options.get('alert_channel_id') is None else DiscordChannelAlertStrategy(client, options['alert_channel_id'], options.get('alert_user_id'), track_alert_message)
+    strategies = [*options.get('strategies', ()), *([owner_alert] if owner_alert else [])]
     dispatcher = options.get('dispatcher') or AlertDispatcher(strategies)
     listener = AuditListener(client, reconciler, dispatcher, bot_user_id, wait_for_pending, clock, on_event=observe)
 
@@ -457,5 +461,6 @@ async def attach(client, **options):
         'intent': record_intent,
         'cancel_intent': cancel_intent,
         'track': track,
+        'test_owner_alert': (lambda: owner_alert.send_text('Parity onboarding test passed. This expected message confirms that private owner alerts are working.')) if owner_alert else None,
         'detach': detach,
     }

@@ -16,11 +16,20 @@ export class DiscordChannelAlertStrategy {
     this.mentionUserId = mentionUserId == null ? null : String(mentionUserId);
     this.sendMessage = sendMessage;
   }
-  async send(report) {
+  async channel() {
     const channel = this.client.channels?.cache?.get(this.channelId) ?? await this.client.channels?.fetch?.(this.channelId);
     if (!channel?.isTextBased?.() || typeof channel.send !== 'function') throw new Error('Parity alert channel must be a text channel');
-    const content = formatDriftAlert(report, this.mentionUserId);
+    return channel;
+  }
+  async sendText(content) {
+    const channel = await this.channel();
+    if (typeof content !== 'string' || !content.trim()) throw new Error('Parity alert text must not be empty');
+    if (content.length > 2000) throw new Error('Parity alert text must not exceed 2000 characters');
     if (this.sendMessage) return this.sendMessage(channel, content);
     return channel.send({ content });
+  }
+  async send(report) {
+    const content = formatDriftAlert(report, this.mentionUserId);
+    return this.sendText(content);
   }
 }

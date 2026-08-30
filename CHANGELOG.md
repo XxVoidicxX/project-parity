@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project follows [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] - 2026-08-29
+
+### Added
+
+- JavaScript and Python onboarding doctors validate bot login, guild and audit-log access, private writable alert channels, optional owner visibility, and an end-to-end tracked test alert.
+- `testOwnerAlert()` / `test_owner_alert` sends the confirmation through result-derived tracking, preserving self-message coverage without an alert loop.
+- Local developer-profile tests cover valid private setup, public alert channels, missing send permission, and test-alert reconciliation in both runtimes. Disposable live doctors passed all eight checks in JavaScript and Python.
+
 ## [1.3.0] - 2026-08-29
 
 ### Added

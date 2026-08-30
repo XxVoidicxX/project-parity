@@ -25,6 +25,7 @@ parity = await attach(
 
 4. Give the bot `VIEW_AUDIT_LOG`, enable moderation audit events, and enable guild message events when self-message coverage is needed.
 5. Before an outbound Discord action, use `parity.intent(...)`. Use `track(...)` when Discord generates the target ID. JavaScript auto-wrap is partial; check `getAutoWrapCoverage()` before relying on it.
+6. Run `npm run doctor -- --send-test` or `parity-doctor --send-test` before deployment. Fix every failed doctor check; the test message must reconcile successfully.
 
 ## Response to an alert
 

@@ -1,11 +1,11 @@
 # Parity Local Inspection — Handoff
 
-**Commit:** `64c6d2e296533a1952c2c2fa7ac893ca0ffe242f` | **Working pack:** `1.3.0` | **Date inspected/tested:** 2026-08-29
+**Commit:** `1.4.0` onboarding-doctor release | **Working pack:** `1.4.0` | **Date inspected/tested:** 2026-08-29
 
 ## Architecture (confirmed from source)
 - `parity-spec/` is the contract: strict ledger/drift schemas, reconciliation rules, 8 report fixtures, 10 target-extraction cases, coverage table, and canonical 69-code audit map.
-- `parity-js/src/` provides `attach`, in-flight result tracking, action-specific listener normalization, serialized reconciler, a bounded operation journal, pluggable memory/SQLite ledgers, private owner-channel alerts, and opt-in manager auto-wrap.
-- `parity-py/parity_py/__init__.py` mirrors the core contract and adapts discord.py plus py-cord high-level/raw events; both languages accept one private Discord alert-channel option. Outbound Python actions remain manual.
+- `parity-js/src/` provides `attach`, an onboarding doctor, in-flight result tracking, action-specific listener normalization, serialized reconciler, a bounded operation journal, pluggable memory/SQLite ledgers, private owner-channel alerts, and opt-in manager auto-wrap.
+- `parity-py/parity_py/` mirrors the core contract and ships the equivalent `parity-doctor` command; both languages accept one private Discord alert-channel option. Outbound Python actions remain manual.
 - Ledger adapters are pluggable. Matching entries are consumed; the new memory-only journal preserves a bounded lifecycle trail but is not durable evidence storage. SQLite remains synchronous/reference-grade.
 
 ## Functional flow (as implemented)
@@ -24,10 +24,11 @@
 5. **Message-level coverage:** Self-authored guild `MESSAGE_CREATE` is live-verified. Audit message delete uses channel because Discord exposes author + channel, not deleted message ID; bulk delete adds exact count; pin/unpin uses options message ID. DMs, edits, reactions, interactions, and other non-audit actions remain out of scope.
 6. **Storage adapter:** Pluggable `insert/all/remove` plus optional `has`; memory and SQLite exist. SQLite has no async I/O, indexed expiry query, transaction strategy across processes, or append-only evidence table.
 7. **Owner notification:** Set `alertChannelId` / `alert_channel_id` to a private Discord channel and optionally an owner mention ID. It posts human-readable incident text; `AGENTS.md` gives AI integrations required safety steps.
+8. **Onboarding validation:** `npm run doctor -- --send-test` or `parity-doctor --send-test` checks access, privacy, send permissions, owner visibility, and one tracked alert message before deployment.
 
 ## Test coverage reality check
-- Current automated total: **56/56** — root/spec/cross-language **9**, JS **25**, Python **22**.
-- Fresh 2026-08-29 live matrices: **JS 14/14**, **Python 5/5** on py-cord 2.6.1, and target/correlation **7/7**. The target run confirmed a real owner alert was sent once and reconciled its own self-message, plus a Discord bulk-delete `count=2` audit mapped to the precise intent correlation ID; all temporary resources were removed. Same-app webhook single-message delete remains explicitly unavailable because Discord did not audit it.
+- Current automated total: **62/62** — root/spec/cross-language **9**, JS **28**, Python **25**. New doctor tests simulate a correct private developer-bot setup, a public alert channel, a missing send permission, and tracked test-alert reconciliation in both runtimes.
+- Fresh 2026-08-29 live matrices: **JS 14/14**, **Python 5/5** on py-cord 2.6.1, target/correlation **7/7**, and onboarding doctor **8/8 in JavaScript plus 8/8 in Python**. Both doctors created and removed a disposable private channel; each test message reconciled without an alert loop. Same-app webhook single-message delete remains explicitly unavailable because Discord did not audit it.
 - New offline coverage: lifecycle correlation, matched correlation IDs, failure cleanup, journal retention, ignored external events, plus existing overwrite/member/message/options targets and auto-wrap coverage.
 - Still not live-tested: true Discord-collapsed bursts, overwrite/pin/bulk-delete/member moderation shapes, reconnect/replay, rate limits, all 69 actions, SQLite contention, and alert retry isolation.
 
@@ -35,10 +36,10 @@
 1. **No reconnect recovery:** gateway downtime can permanently miss actions; no cursor or REST audit replay exists.
 2. **Timing policy is unmeasured:** fixed 120s/5s values can either mask nearby rogue actions or false-alert slow legitimate work.
 3. **Journal evidence is volatile:** matches now leave bounded in-memory evidence, but restart, eviction, and attacker access to the process erase it; there is no append-only sink.
-4. **Owner alerts are channel-dependent:** private-channel permission changes, notification muting, and bot send failures can still delay human response; there is no retry or out-of-band pager.
-4. **Python omission risk remains:** no outbound wrappers; JavaScript coverage remains partial even though omissions are now visible.
-5. **Lossy Discord targets:** single message deletes can only match at channel granularity; disconnect/prune at guild granularity. Counts limit but cannot eliminate same-window substitution risk.
-6. **SQLite is reference-grade:** synchronous full scans and no cross-process coordination/indexed expiry.
+4. **Owner alerts are channel-dependent:** the doctor catches current channel/access misconfiguration, but later permission changes, notification muting, and bot send failures can still delay human response; there is no retry or out-of-band pager.
+5. **Python omission risk remains:** no outbound wrappers; JavaScript coverage remains partial even though omissions are now visible.
+6. **Lossy Discord targets:** single message deletes can only match at channel granularity; disconnect/prune at guild granularity. Counts limit but cannot eliminate same-window substitution risk.
+7. **SQLite is reference-grade:** synchronous full scans and no cross-process coordination/indexed expiry.
 
 ## Key code excerpts
 ```js

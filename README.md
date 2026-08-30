@@ -1,6 +1,6 @@
 # Project Parity
 
-**Version: 1.3.0**
+**Version: 1.4.0**
 
 **Project Parity is a drift watchdog for Discord bots.** Bot tokens get leaked, reused, or run by unauthorized processes, and Discord does not tell the intended bot process when that happens.
 
@@ -41,6 +41,16 @@ Every attached instance exposes a bounded `journal`. It records Parity-owned cod
 ## Get owner alerts
 
 Create a private `#parity-alerts` channel, store its ID in `PARITY_ALERT_CHANNEL_ID`, and pass it as `alertChannelId` above. Parity posts a plain-language warning there and can mention `PARITY_ALERT_USER_ID`. Its own alert message is tracked as a deliberate self-message, so alerts do not trigger an alert loop. This is the recommended default for developers, non-developers, and AI-built bots: the message says what Discord action appeared, when, how confident Parity is, and the first containment step. See [AGENTS.md](AGENTS.md) for an integration checklist coding agents must follow.
+
+## Verify setup
+
+Run the onboarding doctor after connecting Parity. It verifies login, guild reachability, `VIEW_AUDIT_LOG`, that the alert channel is text-based and private from `@everyone`, bot send permission, and optional owner visibility. Add `--send-test` to post one tracked confirmation message and verify that its gateway event reconciles without creating drift.
+
+```sh
+DISCORD_BOT_TOKEN=... PARITY_GUILD_ID=... PARITY_ALERT_CHANNEL_ID=... npm run doctor -- --send-test
+```
+
+For Python, install the package and run `parity-doctor --send-test` with the same environment variables. A failed check states the permission or configuration to fix; do not continue into production with a public or unwritable alert channel.
 
 Discord audit targets are action-specific. In particular, record `MESSAGE_DELETE` and `MESSAGE_BULK_DELETE` against the channel (`targetType: "channel"`); include the number of messages as `count` for a bulk delete. Permission-overwrite targets use `${channelId}:${roleOrMemberId}` with `targetType: "overwrite"`, while pin/unpin actions use the message ID. The complete contract is in [`parity-spec/action-type-coverage.md`](parity-spec/action-type-coverage.md).
 

@@ -8,6 +8,7 @@ export { AuditListener } from './audit-listener.js';
 export { Ledger, MemoryLedgerAdapter } from './ledger.js';
 export { OperationJournal } from './operation-journal.js';
 export { Reconciler } from './reconciler.js';
+export { inspectOnboarding, runOnboardingDoctor } from './doctor.js';
 export { attachAutoWrap, AUTO_WRAP_COVERAGE } from './auto-wrap.js';
 
 class PendingOperations {
@@ -62,7 +63,8 @@ export function attach(client, options = {}) {
     message => ({ actionType: 'MESSAGE_CREATE', targetId: String(message.id), targetType: 'message', guildId: String(channel.guildId ?? channel.guild?.id ?? 'unknown') }),
     () => channel.send({ content }),
   );
-  const strategies = [...(options.strategies ?? []), ...(options.alertChannelId == null ? [] : [new DiscordChannelAlertStrategy({ client, channelId: options.alertChannelId, mentionUserId: options.alertUserId, sendMessage: trackAlertMessage })])];
+  const ownerAlert = options.alertChannelId == null ? null : new DiscordChannelAlertStrategy({ client, channelId: options.alertChannelId, mentionUserId: options.alertUserId, sendMessage: trackAlertMessage });
+  const strategies = [...(options.strategies ?? []), ...(ownerAlert ? [ownerAlert] : [])];
   const dispatcher = options.dispatcher ?? new AlertDispatcher(strategies);
   const listener = new AuditListener({ client, reconciler, dispatcher, botUserId: options.botUserId, clock: options.clock, waitForPending: () => pending.wait(), onEvent: observe });
   listener.start();
@@ -75,6 +77,10 @@ export function attach(client, options = {}) {
     intent: intent => recordIntent(intent),
     cancelIntent,
     track,
+    testOwnerAlert: async () => {
+      if (!ownerAlert) throw new Error('Configure alertChannelId before testing owner alerts');
+      return ownerAlert.sendText('Parity onboarding test passed. This expected message confirms that private owner alerts are working.');
+    },
     detach: () => listener.stop(),
   };
 }
