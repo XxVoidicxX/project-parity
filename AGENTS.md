@@ -24,7 +24,7 @@ parity = await attach(
 ```
 
 4. Give the bot `VIEW_AUDIT_LOG`, enable moderation audit events, and enable guild message events when self-message coverage is needed.
-5. In JavaScript, prefer `autoWrap: true` in `attach(...)` for supported channel, role, member, and ban manager calls; inspect `getAutoWrapCoverage()` and `parity logs` for `auto-wrap-unsupported` records. For unsupported JavaScript APIs and all Python outbound actions, use `intent(...)`; use `track(...)` when Discord generates the target ID.
+5. In JavaScript, prefer `autoWrap: true` in `attach(...)` for supported channel, role, member, ban, emoji, sticker, invite, scheduled-event, AutoMod, permission-overwrite, and thread-create manager calls; inspect `getAutoWrapCoverage()` and `parity logs` for `auto-wrap-unsupported` records. For unsupported JavaScript APIs and all Python outbound actions, use `intent(...)`; use `track(...)` when Discord generates the target ID.
 6. Run `npm run doctor -- --send-test` or `parity-doctor --send-test` before deployment. Fix every failed doctor check; the test message must reconcile successfully.
 7. Run `parity check` after the bot starts. Keep console mode `off` under PM2 unless incident output is wanted; use `parity settings console drift` for drift-only process logs.
 

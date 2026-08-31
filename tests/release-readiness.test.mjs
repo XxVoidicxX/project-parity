@@ -12,9 +12,9 @@ const report = () => readText('TEST_REPORT.md');
 
 test('README links to the test report', () => assert.match(readText('README.md'), /\[Test report\]\(TEST_REPORT\.md\)/));
 test('test report has a clear title', () => assert.match(report(), /^# Project Parity Test Report/m));
-test('test report includes the JavaScript category', () => assert.match(report(), /JavaScript \| 40/));
+test('test report includes the JavaScript category', () => assert.match(report(), /JavaScript \| 42/));
 test('test report includes the Python category', () => assert.match(report(), /Python \| 35/));
-test('test report includes the other category', () => assert.match(report(), /Other \(contract, cross-language, release\) \| 31/));
+test('test report includes the other category', () => assert.match(report(), /Other \(contract, cross-language, release\) \| 33/));
 test('test report includes a coverage map visual', () => assert.match(report(), /flowchart LR/));
 test('test report includes a reconciliation flow visual', () => assert.match(report(), /flowchart TD/));
 test('package versions are synchronized', () => {
@@ -51,6 +51,20 @@ test('the live target harness recognizes Components V2 owner alerts', () => {
   const harness = readText('tools/live-target-test.mjs');
   assert.match(harness, /message\.components/);
   assert.match(harness, /# Parity drift detected/);
+});
+test('the live chaos harness requires and verifies at least one hundred Discord mutations', () => {
+  const harness = readText('tools/live-chaos-test.mjs');
+  assert.match(harness, /PARITY_CHAOS_MUTATIONS \?\? 100/);
+  assert.match(harness, /mutationCount < 100/);
+  assert.match(harness, /matchedMessages === mutationCount/);
+  assert.match(harness, /GatewayIntentBits\.GuildMessages/);
+});
+test('the advanced fixture capture workflow writes sanitized audit shapes only', () => {
+  const capture = readText('tools/capture-audit-fixtures.mjs');
+  assert.match(capture, /sanitized: true/);
+  assert.match(capture, /createdTimestamp: 1704067200000/);
+  assert.doesNotMatch(capture, /writeFileSync\([^\n]*DISCORD_BOT_TOKEN/);
+  assert.match(readText('README.md'), /Audit fixture capture/);
 });
 test('repository hygiene excludes local credentials and runtime state', () => {
   const ignore = readText('.gitignore');

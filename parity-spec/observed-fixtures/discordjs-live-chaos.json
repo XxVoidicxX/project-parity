@@ -1,0 +1,77 @@
+{
+  "schemaVersion": "1.0",
+  "sanitized": true,
+  "source": {
+    "library": "discord.js",
+    "event": "guildAuditLogEntryCreate"
+  },
+  "rawAuditEvents": [
+    {
+      "id": "id-2",
+      "action": 10,
+      "actionType": "Create",
+      "targetId": "id-3",
+      "targetType": "Channel",
+      "guildId": "id-1",
+      "executorId": "id-4",
+      "createdTimestamp": 1704067200000,
+      "extra": {
+        "count": 1,
+        "channelId": null
+      },
+      "changes": [
+        {
+          "key": "name",
+          "oldType": null,
+          "newType": "string"
+        },
+        {
+          "key": "type",
+          "oldType": null,
+          "newType": "number"
+        },
+        {
+          "key": "permission_overwrites",
+          "oldType": null,
+          "newType": "object"
+        },
+        {
+          "key": "nsfw",
+          "oldType": null,
+          "newType": "boolean"
+        },
+        {
+          "key": "rate_limit_per_user",
+          "oldType": null,
+          "newType": "number"
+        },
+        {
+          "key": "flags",
+          "oldType": null,
+          "newType": "number"
+        }
+      ]
+    },
+    {
+      "id": "id-5",
+      "action": 11,
+      "actionType": "Update",
+      "targetId": "id-3",
+      "targetType": "Channel",
+      "guildId": "id-1",
+      "executorId": "id-4",
+      "createdTimestamp": 1704067200001,
+      "extra": {
+        "count": 1,
+        "channelId": null
+      },
+      "changes": [
+        {
+          "key": "topic",
+          "oldType": null,
+          "newType": "string"
+        }
+      ]
+    }
+  ]
+}

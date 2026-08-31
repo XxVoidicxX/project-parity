@@ -8,12 +8,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
-- A 106-test categorized local suite and a linked test report covering JavaScript, Python, contracts, release readiness, bot designs, live-test evidence, and known limits.
+- A 110-test categorized local suite and a linked test report covering JavaScript, Python, contracts, release readiness, bot designs, live-test evidence, and known limits.
 - `COMMANDS.md` with every runtime CLI command, arguments, doctor invocation, troubleshooting guidance, and copy-ready JavaScript and Python integration sheets.
 - Publishable JavaScript and Python package metadata, including `@project-parity/js`, `project-parity`, package-scoped READMEs, licenses, and CLI entry points.
 - CI coverage for supported Node and Python versions plus tag-only npm and PyPI trusted-publishing workflows that require the protected `release` environment.
 - `RELEASING.md` with the one-time registry setup and repeatable release gate.
 - The Components V2-aware live owner-alert assertion, correcting the legacy plain-text detector.
+- Automatic JavaScript manager coverage for emoji, sticker, invite, scheduled-event, AutoMod, permission-overwrite, and thread-create operations.
+- A 100-to-1,000-operation live Discord chaos matrix and an advanced sanitized audit-shape capture workflow.
+
+### Verified
+
+- The live chaos matrix passed 3/3 on 2026-08-31: 100 tracked bot messages reconciled with no drift or residual ledger entries, followed by a clean real channel-update audit probe.
+- The fixture capture workflow produced reviewed, sanitized real channel-create and channel-update audit shapes without raw Discord identifiers or content.
 
 ### Fixed
 

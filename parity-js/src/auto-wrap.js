@@ -3,10 +3,18 @@ const REST_ACTION_MAP = new Map([
   ['GuildChannelManager', { create: ['CHANNEL_CREATE', 'channel', 'after'], edit: ['CHANNEL_UPDATE', 'channel'], delete: ['CHANNEL_DELETE', 'channel'] }],
   ['GuildMemberManager',  { kick: ['MEMBER_KICK', 'user'], ban: ['MEMBER_BAN_ADD', 'user'], edit: ['MEMBER_UPDATE', 'user'] }],
   ['GuildBanManager',     { create: ['MEMBER_BAN_ADD', 'user'], remove: ['MEMBER_BAN_REMOVE', 'user'] }],
+  ['GuildEmojiManager',   { create: ['EMOJI_CREATE', 'emoji', 'after'], edit: ['EMOJI_UPDATE', 'emoji'], delete: ['EMOJI_DELETE', 'emoji'] }],
+  ['GuildStickerManager', { create: ['STICKER_CREATE', 'sticker', 'after'], edit: ['STICKER_UPDATE', 'sticker'], delete: ['STICKER_DELETE', 'sticker'] }],
+  ['GuildInviteManager',  { create: ['INVITE_CREATE', 'invite', 'after'], delete: ['INVITE_DELETE', 'invite'] }],
+  ['GuildScheduledEventManager', { create: ['GUILD_SCHEDULED_EVENT_CREATE', 'scheduled-event', 'after'], edit: ['GUILD_SCHEDULED_EVENT_UPDATE', 'scheduled-event'], delete: ['GUILD_SCHEDULED_EVENT_DELETE', 'scheduled-event'] }],
+  ['AutoModerationRuleManager', { create: ['AUTO_MODERATION_RULE_CREATE', 'auto-moderation-rule', 'after'], edit: ['AUTO_MODERATION_RULE_UPDATE', 'auto-moderation-rule'], delete: ['AUTO_MODERATION_RULE_DELETE', 'auto-moderation-rule'] }],
+  ['PermissionOverwriteManager', { create: ['CHANNEL_OVERWRITE_CREATE', 'overwrite'], edit: ['CHANNEL_OVERWRITE_UPDATE', 'overwrite'], delete: ['CHANNEL_OVERWRITE_DELETE', 'overwrite'] }],
+  ['GuildTextThreadManager', { create: ['THREAD_CREATE', 'thread', 'after'] }],
+  ['GuildForumThreadManager', { create: ['THREAD_CREATE', 'thread', 'after'] }],
   ['WebhookClient',       { edit: ['WEBHOOK_UPDATE', 'webhook'], delete: ['WEBHOOK_DELETE', 'webhook'] }],
 ]);
 
-const AUTOMATIC_MANAGERS = new Set(['RoleManager', 'GuildChannelManager', 'GuildMemberManager', 'GuildBanManager']);
+const AUTOMATIC_MANAGERS = new Set(['RoleManager', 'GuildChannelManager', 'GuildMemberManager', 'GuildBanManager', 'GuildEmojiManager', 'GuildStickerManager', 'GuildInviteManager', 'GuildScheduledEventManager', 'AutoModerationRuleManager', 'PermissionOverwriteManager', 'GuildTextThreadManager', 'GuildForumThreadManager']);
 const UNSUPPORTED_MUTATIONS = new Map([
   ['RoleManager', new Set(['setPositions'])],
   ['GuildChannelManager', new Set(['setPositions'])],
@@ -29,6 +37,7 @@ function resolveTargetId(args) {
   if (typeof first === 'string') return first;
   if (typeof first === 'bigint') return String(first);
   if (first.id != null) return String(first.id);
+  if (first.code != null) return String(first.code);
   if (first.user?.id != null) return String(first.user.id);
   return 'unknown';
 }
@@ -98,26 +107,39 @@ export function attachAutoWrap(client, parity, options = {}) {
   const state = { catalogue: AUTO_WRAP_COVERAGE.map(entry => ({ ...entry, methods: [...entry.methods], knownUnsupportedMutations: [...entry.knownUnsupportedMutations] })), wrapped: [], unsupportedManagers: [], unsupportedCalls: [] };
   const installed = [];
 
+  const install = (owner, slot, manager, guildId) => {
+    const wrapped = wrapManager(manager, parityIntent, parityCancel, guildId, parityTrack, state, options, slot);
+    if (wrapped === manager) return;
+    owner[slot] = wrapped;
+    installed.push({ owner, slot, original: manager, wrapped });
+  };
+
+  const wrapChannel = channel => {
+    if (!channel) return;
+    const guildId = String(channel.guild?.id ?? channel.guildId ?? 'unknown');
+    install(channel, 'permissionOverwrites', channel.permissionOverwrites, guildId);
+    install(channel, 'threads', channel.threads, guildId);
+  };
+
   const wrapGuild = guild => {
-    for (const slot of ['roles', 'channels', 'members', 'bans']) {
-      const original = guild[slot];
-      const wrapped = wrapManager(original, parityIntent, parityCancel, String(guild.id), parityTrack, state, options, slot);
-      if (wrapped === original) continue;
-      guild[slot] = wrapped;
-      installed.push({ guild, slot, original, wrapped });
-    }
+    const guildId = String(guild.id);
+    for (const slot of ['roles', 'channels', 'members', 'bans', 'emojis', 'stickers', 'invites', 'scheduledEvents', 'autoModerationRules']) install(guild, slot, guild[slot], guildId);
+    guild.channels?.cache?.forEach(wrapChannel);
   };
 
   client.guilds?.cache?.forEach(wrapGuild);
   const guildCreateHandler = guild => wrapGuild(guild);
+  const channelCreateHandler = channel => wrapChannel(channel);
   client.on('guildCreate', guildCreateHandler);
+  client.on('channelCreate', channelCreateHandler);
 
   const originalDetach = parity.detach.bind(parity);
   parity.getAutoWrapCoverage = () => structuredClone(state);
   parity.wrapManager = (manager, guildId) => wrapManager(manager, parityIntent, parityCancel, String(guildId ?? 'unknown'), parityTrack, state, options, 'manual');
   parity.detach = () => {
     client.off?.('guildCreate', guildCreateHandler);
-    for (const { guild, slot, original, wrapped } of installed) if (guild[slot] === wrapped) guild[slot] = original;
+    client.off?.('channelCreate', channelCreateHandler);
+    for (const { owner, slot, original, wrapped } of installed) if (owner[slot] === wrapped) owner[slot] = original;
     delete parity[AUTO_WRAP_STATE];
     delete parity.getAutoWrapCoverage;
     delete parity.wrapManager;

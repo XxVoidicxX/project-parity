@@ -21,7 +21,7 @@ Discord's audit `target_id` is not always the object passed to the REST call. Us
 | `INVITE_*` | Invite code | `invite` | None |
 | `VOICE_CHANNEL_STATUS_*` | Channel ID | `channel` | None |
 
-JavaScript auto-wrap is deliberately partial. Set `autoWrap: true` in `attach(...)`, then call `parity.getAutoWrapCoverage()` to inspect wrapped managers, unsupported manager objects, and observed calls to known unsupported mutations such as role/channel position updates or member pruning. Those known calls are persisted as `auto-wrap-unsupported` journal/runtime records. Use `autoWrap: { onUnsupportedCall: call => ... }` to also route them into application logging. Standalone `WebhookClient` instances can be wrapped explicitly with `parity.wrapManager(webhookClient, guildId)`. Python outbound calls remain manual in v1.7.1.
+JavaScript auto-wrap is deliberately partial. Set `autoWrap: true` in `attach(...)` to cover guild role, channel, member, ban, emoji, sticker, invite, scheduled-event, and AutoMod managers plus channel permission overwrites and thread creation. Call `parity.getAutoWrapCoverage()` to inspect wrapped managers, unsupported manager objects, and observed calls to known unsupported mutations such as role/channel position updates or member pruning. Those known calls are persisted as `auto-wrap-unsupported` journal/runtime records. Use `autoWrap: { onUnsupportedCall: call => ... }` to also route them into application logging. Standalone `WebhookClient` instances can be wrapped explicitly with `parity.wrapManager(webhookClient, guildId)`. Python outbound calls remain manual in v1.7.1.
 
 ## Live Discord check
 

@@ -32,7 +32,7 @@ parity = await attach(
 )
 ```
 
-Set JavaScript `autoWrap: true` to automatically ledger supported channel, role, member, and ban manager operations; it is the recommended one-line setup. Known unsupported manager mutations are recorded as `auto-wrap-unsupported` lifecycle records, visible through `parity logs`, so an unsupported call is not silent. Check `parity.getAutoWrapCoverage()` after startup. Python outbound calls remain explicit: use `intent(...)` for target-known actions and result-derived `track(...)` for generated IDs. Neither runtime claims to cover arbitrary Discord APIs. The client needs `VIEW_AUDIT_LOG` and the `GUILD_MODERATION` gateway intent.
+Set JavaScript `autoWrap: true` to automatically ledger supported channel, role, member, ban, emoji, sticker, invite, scheduled-event, AutoMod, permission-overwrite, and thread-create manager operations; it is the recommended one-line setup. Known unsupported manager mutations are recorded as `auto-wrap-unsupported` lifecycle records, visible through `parity logs`, so an unsupported call is not silent. Check `parity.getAutoWrapCoverage()` after startup. Python outbound calls remain explicit: use `intent(...)` for target-known actions and result-derived `track(...)` for generated IDs. Neither runtime claims to cover arbitrary Discord APIs. The client needs `VIEW_AUDIT_LOG` and the `GUILD_MODERATION` gateway intent.
 
 Every attached instance exposes a bounded `journal`. It records Parity-owned code intent, REST success or rejection, every in-scope audit/message event delivered by Discord, and its matched, drift, duplicate, or non-bot outcome. Matched events include the exact consumed `correlationId`; `onEvent(record)` receives the same normalized record for forwarding to observability infrastructure. This observes only events Discord delivers through the audit-log and message gateway handlers, not arbitrary gateway traffic or actions that Discord does not audit.
 
@@ -78,6 +78,10 @@ See the [Test report](TEST_REPORT.md) for the current suite map, bot-design cove
 ## Publishing
 
 The repository contains CI and tag-only release workflows for npm and PyPI. Follow [Releasing](RELEASING.md) to configure trusted publishing before creating the first release tag.
+
+## Advanced compatibility fixtures
+
+Advanced maintainers can capture sanitized real Discord audit-event shapes while upgrading discord.js or validating a new bot design. See [Audit fixture capture](docs/audit-fixtures.md).
 
 ## License
 

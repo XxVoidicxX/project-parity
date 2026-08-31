@@ -73,7 +73,7 @@ parity check
 parity logs --drift --limit 20
 ```
 
-`autoWrap: true` covers the documented role, channel, member, and ban manager methods. Check coverage after startup:
+`autoWrap: true` covers the documented role, channel, member, ban, emoji, sticker, invite, scheduled-event, AutoMod, permission-overwrite, and thread-create manager methods. Check coverage after startup:
 
 ```js
 console.log(parity.getAutoWrapCoverage());
@@ -87,6 +87,17 @@ await parity.track(
   () => channel.send('Hello from the bot'),
 );
 ```
+
+## Advanced repository checks
+
+These commands are for maintainers testing a disposable guild. They require `DISCORD_BOT_TOKEN` and `PARITY_GUILD_ID`, create temporary resources, and remove those resources when complete.
+
+| Command | Arguments | What it verifies | Example |
+| --- | --- | --- | --- |
+| `npm run live-test:chaos` | `PARITY_CHAOS_MUTATIONS` from 100 through 1,000 | At least 100 real tracked bot messages reconcile, then a real audit-log channel update reconciles after the burst. | `$env:PARITY_CHAOS_MUTATIONS = '100'; npm run live-test:chaos` |
+| `npm run capture:audits --` | `--count`, `--timeout-ms`, `--output` | Captures anonymized audit payload shapes for review during a Discord or discord.js upgrade. | `npm run capture:audits -- --count 25 --output parity-spec/observed-fixtures/upgrade.json` |
+
+See [Audit fixture capture](docs/audit-fixtures.md) before committing a capture. The tool replaces identifiers and timestamps and excludes raw change values.
 
 ## Quick sheet: a simple Python bot
 

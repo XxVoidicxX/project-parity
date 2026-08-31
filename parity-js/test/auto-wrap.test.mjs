@@ -13,7 +13,7 @@ function createClient(guild) {
 }
 
 function createGuild(overrides = {}) {
-  return { id: 'guild', roles: {}, channels: {}, members: {}, bans: {}, ...overrides };
+  return { id: 'guild', roles: {}, channels: {}, members: {}, bans: {}, emojis: {}, stickers: {}, invites: {}, scheduledEvents: {}, autoModerationRules: {}, ...overrides };
 }
 
 test('autoWrap false leaves supported managers untouched', async () => {
@@ -76,6 +76,55 @@ test('autoWrap maps guild ban creation and removal', async () => {
   await guild.bans.create('banned-user');
   await guild.bans.remove({ id: 'unbanned-user' });
   assert.deepEqual((await parity.ledger.entries()).map(entry => [entry.actionType, entry.targetId]), [['MEMBER_BAN_ADD', 'banned-user'], ['MEMBER_BAN_REMOVE', 'unbanned-user']]);
+  parity.detach();
+});
+
+test('autoWrap maps emoji sticker invite scheduled-event and AutoMod managers', async () => {
+  class GuildEmojiManager { async create() { return { id: 'emoji-created' }; } async edit(emoji) { return { id: emoji }; } async delete() {} }
+  class GuildStickerManager { async create() { return { id: 'sticker-created' }; } async edit(sticker) { return { id: sticker }; } async delete() {} }
+  class GuildInviteManager { async create() { return { code: 'invite-created' }; } async delete() {} }
+  class GuildScheduledEventManager { async create() { return { id: 'event-created' }; } async edit(event) { return { id: event }; } async delete() {} }
+  class AutoModerationRuleManager { async create() { return { id: 'rule-created' }; } async edit(rule) { return { id: rule }; } async delete() {} }
+  const guild = createGuild({ emojis: new GuildEmojiManager(), stickers: new GuildStickerManager(), invites: new GuildInviteManager(), scheduledEvents: new GuildScheduledEventManager(), autoModerationRules: new AutoModerationRuleManager() });
+  const parity = attach(createClient(guild), { clock, runtime: false, autoWrap: true });
+  await guild.emojis.create({ attachment: 'emoji' });
+  await guild.emojis.edit('emoji-updated', { name: 'updated' });
+  await guild.emojis.delete('emoji-deleted');
+  await guild.stickers.create({ file: 'sticker' });
+  await guild.stickers.edit('sticker-updated', { name: 'updated' });
+  await guild.stickers.delete('sticker-deleted');
+  await guild.invites.create('channel');
+  await guild.invites.delete('invite-deleted');
+  await guild.scheduledEvents.create({ name: 'event' });
+  await guild.scheduledEvents.edit('event-updated', { name: 'updated' });
+  await guild.scheduledEvents.delete('event-deleted');
+  await guild.autoModerationRules.create({ name: 'rule' });
+  await guild.autoModerationRules.edit('rule-updated', { name: 'updated' });
+  await guild.autoModerationRules.delete('rule-deleted');
+  assert.deepEqual((await parity.ledger.entries()).map(entry => [entry.actionType, entry.targetId]), [
+    ['EMOJI_CREATE', 'emoji-created'], ['EMOJI_UPDATE', 'emoji-updated'], ['EMOJI_DELETE', 'emoji-deleted'],
+    ['STICKER_CREATE', 'sticker-created'], ['STICKER_UPDATE', 'sticker-updated'], ['STICKER_DELETE', 'sticker-deleted'],
+    ['INVITE_CREATE', 'invite-created'], ['INVITE_DELETE', 'invite-deleted'],
+    ['GUILD_SCHEDULED_EVENT_CREATE', 'event-created'], ['GUILD_SCHEDULED_EVENT_UPDATE', 'event-updated'], ['GUILD_SCHEDULED_EVENT_DELETE', 'event-deleted'],
+    ['AUTO_MODERATION_RULE_CREATE', 'rule-created'], ['AUTO_MODERATION_RULE_UPDATE', 'rule-updated'], ['AUTO_MODERATION_RULE_DELETE', 'rule-deleted'],
+  ]);
+  parity.detach();
+});
+
+test('autoWrap maps nested permission overwrite and thread managers', async () => {
+  class GuildChannelManager { constructor(channel) { this.cache = new Map([[channel.id, channel]]); } }
+  class PermissionOverwriteManager { async create(target) { return target; } async edit(target) { return target; } async delete(target) { return target; } }
+  class GuildTextThreadManager { async create() { return { id: 'thread-created' }; } }
+  const channel = { id: 'channel', guildId: 'guild', permissionOverwrites: new PermissionOverwriteManager(), threads: new GuildTextThreadManager() };
+  const guild = createGuild({ channels: new GuildChannelManager(channel) });
+  const parity = attach(createClient(guild), { clock, runtime: false, autoWrap: true });
+  await channel.permissionOverwrites.create('overwrite-created', {});
+  await channel.permissionOverwrites.edit({ id: 'overwrite-updated' }, {});
+  await channel.permissionOverwrites.delete('overwrite-deleted');
+  await channel.threads.create({ name: 'thread' });
+  assert.deepEqual((await parity.ledger.entries()).map(entry => [entry.actionType, entry.targetId]), [
+    ['CHANNEL_OVERWRITE_CREATE', 'overwrite-created'], ['CHANNEL_OVERWRITE_UPDATE', 'overwrite-updated'], ['CHANNEL_OVERWRITE_DELETE', 'overwrite-deleted'], ['THREAD_CREATE', 'thread-created'],
+  ]);
   parity.detach();
 });
 
