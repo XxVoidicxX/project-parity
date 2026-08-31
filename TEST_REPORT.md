@@ -5,17 +5,17 @@
 
 ## Coverage at a glance
 
-The local suite contains **110 tests** across three deliberately different categories. A category is not merely a language label: it exercises a different failure surface.
+The local suite contains **113 tests** across three deliberately different categories. A category is not merely a language label: it exercises a different failure surface.
 
 | Category | Tests | Primary purpose |
 | --- | ---: | --- |
 | JavaScript | 42 | discord.js attachment, manager auto-tracking, runtime/CLI, reconciliation |
 | Python | 35 | discord.py-style attachment, manual recording workflow, runtime/CLI, reconciliation |
-| Other (contract, cross-language, release) | 33 | shared schema, byte parity, documentation, packaging, repository hygiene |
+| Other (contract, cross-language, release) | 36 | shared schema, byte parity, documentation, packaging, repository hygiene |
 
 ```mermaid
 flowchart LR
-  JS[JavaScript\n42 tests] --> Contract[Shared contract\n33 tests]
+  JS[JavaScript\n42 tests] --> Contract[Shared contract\n36 tests]
   PY[Python\n35 tests] --> Contract
   JS --> Live[Disposable JavaScript Discord matrix\n14 checks]
 ```
@@ -51,6 +51,7 @@ The first visual shows independent runtime coverage converging on the shared con
 | `tests/spec.test.mjs` | 6 | JSON schemas, canonical targets, reconciliation rules, installed discord.js action enum |
 | `tests/cross-language.test.mjs` | 3 | Byte-identical reports, journals, and owner-facing text across runtimes |
 | `tests/release-readiness.test.mjs` | 24 | Report/README linkage, command and release parity, CI/release workflow requirements, release versions, schemas, fixtures, action-map uniqueness, setup guidance, Components V2 live-alert detection, live-chaos safeguards, fixture-capture hygiene, ignored credentials/runtime files |
+| `tests/bot-matrix.test.mjs` | 3 | 100 distinct profiles, 50 JavaScript baseline/Parity paths, 50 Python baseline/Parity paths |
 
 ## Different bot designs covered
 
@@ -74,7 +75,7 @@ Run the deterministic suite from the repository root:
 npm test
 ```
 
-This runs the 33 other tests, 42 JavaScript tests, and 35 Python tests. Python’s test runner emits occasional asyncio slow-task diagnostics on this machine during large concurrency cases; the suite still exits successfully and treats them as performance diagnostics, not assertions.
+This runs the 36 other tests, 42 JavaScript tests, and 35 Python tests. Python’s test runner emits occasional asyncio slow-task diagnostics on this machine during large concurrency cases; the suite still exits successfully and treats them as performance diagnostics, not assertions.
 
 The disposable live matrix is separate because it creates and removes Discord channels, roles, webhooks, and messages in a dedicated guild:
 
@@ -87,6 +88,8 @@ The latest run passed **14/14 checks** on 2026-08-29. It verified unrecorded dri
 For a real Discord stress run, use `npm run live-test:chaos`. It submits 100 tracked bot messages by default, requires at least 100 operations, then verifies a real channel-update audit probe after the burst. It removes its test channel. Set `PARITY_CHAOS_MUTATIONS` from 100 through 1,000 to change the size.
 
 The 2026-08-31 live chaos run passed **3/3 checks**: 100/100 real bot messages reconciled, the ledger returned to zero entries without drift, and a post-burst channel-update audit entry reconciled. The same session captured reviewed sanitized channel-create and channel-update shapes in `parity-spec/observed-fixtures/discordjs-live-chaos.json`.
+
+The 2026-08-31 live bot matrix passed **2/2 checks**: each of the 100 catalog profiles sent a baseline output without Parity, then each sent a tracked output with Parity. All 100 tracked outputs reconciled with zero drift and zero residual ledger entries. The matrix deletes its dedicated channel afterward.
 
 ## Boundaries and remaining gaps
 

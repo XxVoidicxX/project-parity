@@ -83,6 +83,10 @@ The repository contains CI and tag-only release workflows for npm and PyPI. Foll
 
 Advanced maintainers can capture sanitized real Discord audit-event shapes while upgrading discord.js or validating a new bot design. See [Audit fixture capture](docs/audit-fixtures.md).
 
+## Copyable bot matrix
+
+[The bot matrix](examples/bot-matrix/README.md) contains 100 small bot starting points: 50 JavaScript and 50 Python examples covering responders, channel and role tools, moderation, invites, scheduled events, AutoMod, threads, and permission management. Every example has a baseline and a Parity-enabled construction path.
+
 ## License
 
 Free to use, modify, embed, and sell products built with Parity; you may not resell Parity itself or a competing rebrand until the FSL change date. See [LICENSE.md](LICENSE.md).

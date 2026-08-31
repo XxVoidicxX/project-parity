@@ -1,0 +1,905 @@
+{
+  "schemaVersion": "1.0",
+  "variants": [
+    {
+      "id": "javascript-01-message-responder-minimal",
+      "language": "javascript",
+      "family": "message-responder",
+      "shape": "minimal",
+      "integration": "track",
+      "actionType": "MESSAGE_CREATE",
+      "targetType": "message"
+    },
+    {
+      "id": "javascript-02-message-responder-environment-configured",
+      "language": "javascript",
+      "family": "message-responder",
+      "shape": "environment-configured",
+      "integration": "track",
+      "actionType": "MESSAGE_CREATE",
+      "targetType": "message"
+    },
+    {
+      "id": "javascript-03-message-responder-prefix-command",
+      "language": "javascript",
+      "family": "message-responder",
+      "shape": "prefix-command",
+      "integration": "track",
+      "actionType": "MESSAGE_CREATE",
+      "targetType": "message"
+    },
+    {
+      "id": "javascript-04-message-responder-slash-command",
+      "language": "javascript",
+      "family": "message-responder",
+      "shape": "slash-command",
+      "integration": "track",
+      "actionType": "MESSAGE_CREATE",
+      "targetType": "message"
+    },
+    {
+      "id": "javascript-05-message-responder-worker-process",
+      "language": "javascript",
+      "family": "message-responder",
+      "shape": "worker-process",
+      "integration": "track",
+      "actionType": "MESSAGE_CREATE",
+      "targetType": "message"
+    },
+    {
+      "id": "javascript-06-channel-manager-minimal",
+      "language": "javascript",
+      "family": "channel-manager",
+      "shape": "minimal",
+      "integration": "auto",
+      "actionType": "CHANNEL_UPDATE",
+      "targetType": "channel"
+    },
+    {
+      "id": "javascript-07-channel-manager-environment-configured",
+      "language": "javascript",
+      "family": "channel-manager",
+      "shape": "environment-configured",
+      "integration": "auto",
+      "actionType": "CHANNEL_UPDATE",
+      "targetType": "channel"
+    },
+    {
+      "id": "javascript-08-channel-manager-prefix-command",
+      "language": "javascript",
+      "family": "channel-manager",
+      "shape": "prefix-command",
+      "integration": "auto",
+      "actionType": "CHANNEL_UPDATE",
+      "targetType": "channel"
+    },
+    {
+      "id": "javascript-09-channel-manager-slash-command",
+      "language": "javascript",
+      "family": "channel-manager",
+      "shape": "slash-command",
+      "integration": "auto",
+      "actionType": "CHANNEL_UPDATE",
+      "targetType": "channel"
+    },
+    {
+      "id": "javascript-10-channel-manager-worker-process",
+      "language": "javascript",
+      "family": "channel-manager",
+      "shape": "worker-process",
+      "integration": "auto",
+      "actionType": "CHANNEL_UPDATE",
+      "targetType": "channel"
+    },
+    {
+      "id": "javascript-11-role-manager-minimal",
+      "language": "javascript",
+      "family": "role-manager",
+      "shape": "minimal",
+      "integration": "auto",
+      "actionType": "ROLE_UPDATE",
+      "targetType": "role"
+    },
+    {
+      "id": "javascript-12-role-manager-environment-configured",
+      "language": "javascript",
+      "family": "role-manager",
+      "shape": "environment-configured",
+      "integration": "auto",
+      "actionType": "ROLE_UPDATE",
+      "targetType": "role"
+    },
+    {
+      "id": "javascript-13-role-manager-prefix-command",
+      "language": "javascript",
+      "family": "role-manager",
+      "shape": "prefix-command",
+      "integration": "auto",
+      "actionType": "ROLE_UPDATE",
+      "targetType": "role"
+    },
+    {
+      "id": "javascript-14-role-manager-slash-command",
+      "language": "javascript",
+      "family": "role-manager",
+      "shape": "slash-command",
+      "integration": "auto",
+      "actionType": "ROLE_UPDATE",
+      "targetType": "role"
+    },
+    {
+      "id": "javascript-15-role-manager-worker-process",
+      "language": "javascript",
+      "family": "role-manager",
+      "shape": "worker-process",
+      "integration": "auto",
+      "actionType": "ROLE_UPDATE",
+      "targetType": "role"
+    },
+    {
+      "id": "javascript-16-member-moderator-minimal",
+      "language": "javascript",
+      "family": "member-moderator",
+      "shape": "minimal",
+      "integration": "auto",
+      "actionType": "MEMBER_KICK",
+      "targetType": "user"
+    },
+    {
+      "id": "javascript-17-member-moderator-environment-configured",
+      "language": "javascript",
+      "family": "member-moderator",
+      "shape": "environment-configured",
+      "integration": "auto",
+      "actionType": "MEMBER_KICK",
+      "targetType": "user"
+    },
+    {
+      "id": "javascript-18-member-moderator-prefix-command",
+      "language": "javascript",
+      "family": "member-moderator",
+      "shape": "prefix-command",
+      "integration": "auto",
+      "actionType": "MEMBER_KICK",
+      "targetType": "user"
+    },
+    {
+      "id": "javascript-19-member-moderator-slash-command",
+      "language": "javascript",
+      "family": "member-moderator",
+      "shape": "slash-command",
+      "integration": "auto",
+      "actionType": "MEMBER_KICK",
+      "targetType": "user"
+    },
+    {
+      "id": "javascript-20-member-moderator-worker-process",
+      "language": "javascript",
+      "family": "member-moderator",
+      "shape": "worker-process",
+      "integration": "auto",
+      "actionType": "MEMBER_KICK",
+      "targetType": "user"
+    },
+    {
+      "id": "javascript-21-ban-moderator-minimal",
+      "language": "javascript",
+      "family": "ban-moderator",
+      "shape": "minimal",
+      "integration": "auto",
+      "actionType": "MEMBER_BAN_ADD",
+      "targetType": "user"
+    },
+    {
+      "id": "javascript-22-ban-moderator-environment-configured",
+      "language": "javascript",
+      "family": "ban-moderator",
+      "shape": "environment-configured",
+      "integration": "auto",
+      "actionType": "MEMBER_BAN_ADD",
+      "targetType": "user"
+    },
+    {
+      "id": "javascript-23-ban-moderator-prefix-command",
+      "language": "javascript",
+      "family": "ban-moderator",
+      "shape": "prefix-command",
+      "integration": "auto",
+      "actionType": "MEMBER_BAN_ADD",
+      "targetType": "user"
+    },
+    {
+      "id": "javascript-24-ban-moderator-slash-command",
+      "language": "javascript",
+      "family": "ban-moderator",
+      "shape": "slash-command",
+      "integration": "auto",
+      "actionType": "MEMBER_BAN_ADD",
+      "targetType": "user"
+    },
+    {
+      "id": "javascript-25-ban-moderator-worker-process",
+      "language": "javascript",
+      "family": "ban-moderator",
+      "shape": "worker-process",
+      "integration": "auto",
+      "actionType": "MEMBER_BAN_ADD",
+      "targetType": "user"
+    },
+    {
+      "id": "javascript-26-invite-helper-minimal",
+      "language": "javascript",
+      "family": "invite-helper",
+      "shape": "minimal",
+      "integration": "auto",
+      "actionType": "INVITE_CREATE",
+      "targetType": "invite"
+    },
+    {
+      "id": "javascript-27-invite-helper-environment-configured",
+      "language": "javascript",
+      "family": "invite-helper",
+      "shape": "environment-configured",
+      "integration": "auto",
+      "actionType": "INVITE_CREATE",
+      "targetType": "invite"
+    },
+    {
+      "id": "javascript-28-invite-helper-prefix-command",
+      "language": "javascript",
+      "family": "invite-helper",
+      "shape": "prefix-command",
+      "integration": "auto",
+      "actionType": "INVITE_CREATE",
+      "targetType": "invite"
+    },
+    {
+      "id": "javascript-29-invite-helper-slash-command",
+      "language": "javascript",
+      "family": "invite-helper",
+      "shape": "slash-command",
+      "integration": "auto",
+      "actionType": "INVITE_CREATE",
+      "targetType": "invite"
+    },
+    {
+      "id": "javascript-30-invite-helper-worker-process",
+      "language": "javascript",
+      "family": "invite-helper",
+      "shape": "worker-process",
+      "integration": "auto",
+      "actionType": "INVITE_CREATE",
+      "targetType": "invite"
+    },
+    {
+      "id": "javascript-31-event-coordinator-minimal",
+      "language": "javascript",
+      "family": "event-coordinator",
+      "shape": "minimal",
+      "integration": "auto",
+      "actionType": "GUILD_SCHEDULED_EVENT_UPDATE",
+      "targetType": "scheduled-event"
+    },
+    {
+      "id": "javascript-32-event-coordinator-environment-configured",
+      "language": "javascript",
+      "family": "event-coordinator",
+      "shape": "environment-configured",
+      "integration": "auto",
+      "actionType": "GUILD_SCHEDULED_EVENT_UPDATE",
+      "targetType": "scheduled-event"
+    },
+    {
+      "id": "javascript-33-event-coordinator-prefix-command",
+      "language": "javascript",
+      "family": "event-coordinator",
+      "shape": "prefix-command",
+      "integration": "auto",
+      "actionType": "GUILD_SCHEDULED_EVENT_UPDATE",
+      "targetType": "scheduled-event"
+    },
+    {
+      "id": "javascript-34-event-coordinator-slash-command",
+      "language": "javascript",
+      "family": "event-coordinator",
+      "shape": "slash-command",
+      "integration": "auto",
+      "actionType": "GUILD_SCHEDULED_EVENT_UPDATE",
+      "targetType": "scheduled-event"
+    },
+    {
+      "id": "javascript-35-event-coordinator-worker-process",
+      "language": "javascript",
+      "family": "event-coordinator",
+      "shape": "worker-process",
+      "integration": "auto",
+      "actionType": "GUILD_SCHEDULED_EVENT_UPDATE",
+      "targetType": "scheduled-event"
+    },
+    {
+      "id": "javascript-36-automod-manager-minimal",
+      "language": "javascript",
+      "family": "automod-manager",
+      "shape": "minimal",
+      "integration": "auto",
+      "actionType": "AUTO_MODERATION_RULE_UPDATE",
+      "targetType": "auto-moderation-rule"
+    },
+    {
+      "id": "javascript-37-automod-manager-environment-configured",
+      "language": "javascript",
+      "family": "automod-manager",
+      "shape": "environment-configured",
+      "integration": "auto",
+      "actionType": "AUTO_MODERATION_RULE_UPDATE",
+      "targetType": "auto-moderation-rule"
+    },
+    {
+      "id": "javascript-38-automod-manager-prefix-command",
+      "language": "javascript",
+      "family": "automod-manager",
+      "shape": "prefix-command",
+      "integration": "auto",
+      "actionType": "AUTO_MODERATION_RULE_UPDATE",
+      "targetType": "auto-moderation-rule"
+    },
+    {
+      "id": "javascript-39-automod-manager-slash-command",
+      "language": "javascript",
+      "family": "automod-manager",
+      "shape": "slash-command",
+      "integration": "auto",
+      "actionType": "AUTO_MODERATION_RULE_UPDATE",
+      "targetType": "auto-moderation-rule"
+    },
+    {
+      "id": "javascript-40-automod-manager-worker-process",
+      "language": "javascript",
+      "family": "automod-manager",
+      "shape": "worker-process",
+      "integration": "auto",
+      "actionType": "AUTO_MODERATION_RULE_UPDATE",
+      "targetType": "auto-moderation-rule"
+    },
+    {
+      "id": "javascript-41-thread-support-minimal",
+      "language": "javascript",
+      "family": "thread-support",
+      "shape": "minimal",
+      "integration": "auto",
+      "actionType": "THREAD_CREATE",
+      "targetType": "thread"
+    },
+    {
+      "id": "javascript-42-thread-support-environment-configured",
+      "language": "javascript",
+      "family": "thread-support",
+      "shape": "environment-configured",
+      "integration": "auto",
+      "actionType": "THREAD_CREATE",
+      "targetType": "thread"
+    },
+    {
+      "id": "javascript-43-thread-support-prefix-command",
+      "language": "javascript",
+      "family": "thread-support",
+      "shape": "prefix-command",
+      "integration": "auto",
+      "actionType": "THREAD_CREATE",
+      "targetType": "thread"
+    },
+    {
+      "id": "javascript-44-thread-support-slash-command",
+      "language": "javascript",
+      "family": "thread-support",
+      "shape": "slash-command",
+      "integration": "auto",
+      "actionType": "THREAD_CREATE",
+      "targetType": "thread"
+    },
+    {
+      "id": "javascript-45-thread-support-worker-process",
+      "language": "javascript",
+      "family": "thread-support",
+      "shape": "worker-process",
+      "integration": "auto",
+      "actionType": "THREAD_CREATE",
+      "targetType": "thread"
+    },
+    {
+      "id": "javascript-46-permission-manager-minimal",
+      "language": "javascript",
+      "family": "permission-manager",
+      "shape": "minimal",
+      "integration": "auto",
+      "actionType": "CHANNEL_OVERWRITE_UPDATE",
+      "targetType": "overwrite"
+    },
+    {
+      "id": "javascript-47-permission-manager-environment-configured",
+      "language": "javascript",
+      "family": "permission-manager",
+      "shape": "environment-configured",
+      "integration": "auto",
+      "actionType": "CHANNEL_OVERWRITE_UPDATE",
+      "targetType": "overwrite"
+    },
+    {
+      "id": "javascript-48-permission-manager-prefix-command",
+      "language": "javascript",
+      "family": "permission-manager",
+      "shape": "prefix-command",
+      "integration": "auto",
+      "actionType": "CHANNEL_OVERWRITE_UPDATE",
+      "targetType": "overwrite"
+    },
+    {
+      "id": "javascript-49-permission-manager-slash-command",
+      "language": "javascript",
+      "family": "permission-manager",
+      "shape": "slash-command",
+      "integration": "auto",
+      "actionType": "CHANNEL_OVERWRITE_UPDATE",
+      "targetType": "overwrite"
+    },
+    {
+      "id": "javascript-50-permission-manager-worker-process",
+      "language": "javascript",
+      "family": "permission-manager",
+      "shape": "worker-process",
+      "integration": "auto",
+      "actionType": "CHANNEL_OVERWRITE_UPDATE",
+      "targetType": "overwrite"
+    },
+    {
+      "id": "python-01-message-responder-minimal",
+      "language": "python",
+      "family": "message-responder",
+      "shape": "minimal",
+      "integration": "track",
+      "actionType": "MESSAGE_CREATE",
+      "targetType": "message"
+    },
+    {
+      "id": "python-02-message-responder-environment-configured",
+      "language": "python",
+      "family": "message-responder",
+      "shape": "environment-configured",
+      "integration": "track",
+      "actionType": "MESSAGE_CREATE",
+      "targetType": "message"
+    },
+    {
+      "id": "python-03-message-responder-prefix-command",
+      "language": "python",
+      "family": "message-responder",
+      "shape": "prefix-command",
+      "integration": "track",
+      "actionType": "MESSAGE_CREATE",
+      "targetType": "message"
+    },
+    {
+      "id": "python-04-message-responder-slash-command",
+      "language": "python",
+      "family": "message-responder",
+      "shape": "slash-command",
+      "integration": "track",
+      "actionType": "MESSAGE_CREATE",
+      "targetType": "message"
+    },
+    {
+      "id": "python-05-message-responder-worker-process",
+      "language": "python",
+      "family": "message-responder",
+      "shape": "worker-process",
+      "integration": "track",
+      "actionType": "MESSAGE_CREATE",
+      "targetType": "message"
+    },
+    {
+      "id": "python-06-channel-manager-minimal",
+      "language": "python",
+      "family": "channel-manager",
+      "shape": "minimal",
+      "integration": "intent",
+      "actionType": "CHANNEL_UPDATE",
+      "targetType": "channel"
+    },
+    {
+      "id": "python-07-channel-manager-environment-configured",
+      "language": "python",
+      "family": "channel-manager",
+      "shape": "environment-configured",
+      "integration": "intent",
+      "actionType": "CHANNEL_UPDATE",
+      "targetType": "channel"
+    },
+    {
+      "id": "python-08-channel-manager-prefix-command",
+      "language": "python",
+      "family": "channel-manager",
+      "shape": "prefix-command",
+      "integration": "intent",
+      "actionType": "CHANNEL_UPDATE",
+      "targetType": "channel"
+    },
+    {
+      "id": "python-09-channel-manager-slash-command",
+      "language": "python",
+      "family": "channel-manager",
+      "shape": "slash-command",
+      "integration": "intent",
+      "actionType": "CHANNEL_UPDATE",
+      "targetType": "channel"
+    },
+    {
+      "id": "python-10-channel-manager-worker-process",
+      "language": "python",
+      "family": "channel-manager",
+      "shape": "worker-process",
+      "integration": "intent",
+      "actionType": "CHANNEL_UPDATE",
+      "targetType": "channel"
+    },
+    {
+      "id": "python-11-role-manager-minimal",
+      "language": "python",
+      "family": "role-manager",
+      "shape": "minimal",
+      "integration": "intent",
+      "actionType": "ROLE_UPDATE",
+      "targetType": "role"
+    },
+    {
+      "id": "python-12-role-manager-environment-configured",
+      "language": "python",
+      "family": "role-manager",
+      "shape": "environment-configured",
+      "integration": "intent",
+      "actionType": "ROLE_UPDATE",
+      "targetType": "role"
+    },
+    {
+      "id": "python-13-role-manager-prefix-command",
+      "language": "python",
+      "family": "role-manager",
+      "shape": "prefix-command",
+      "integration": "intent",
+      "actionType": "ROLE_UPDATE",
+      "targetType": "role"
+    },
+    {
+      "id": "python-14-role-manager-slash-command",
+      "language": "python",
+      "family": "role-manager",
+      "shape": "slash-command",
+      "integration": "intent",
+      "actionType": "ROLE_UPDATE",
+      "targetType": "role"
+    },
+    {
+      "id": "python-15-role-manager-worker-process",
+      "language": "python",
+      "family": "role-manager",
+      "shape": "worker-process",
+      "integration": "intent",
+      "actionType": "ROLE_UPDATE",
+      "targetType": "role"
+    },
+    {
+      "id": "python-16-member-moderator-minimal",
+      "language": "python",
+      "family": "member-moderator",
+      "shape": "minimal",
+      "integration": "intent",
+      "actionType": "MEMBER_KICK",
+      "targetType": "user"
+    },
+    {
+      "id": "python-17-member-moderator-environment-configured",
+      "language": "python",
+      "family": "member-moderator",
+      "shape": "environment-configured",
+      "integration": "intent",
+      "actionType": "MEMBER_KICK",
+      "targetType": "user"
+    },
+    {
+      "id": "python-18-member-moderator-prefix-command",
+      "language": "python",
+      "family": "member-moderator",
+      "shape": "prefix-command",
+      "integration": "intent",
+      "actionType": "MEMBER_KICK",
+      "targetType": "user"
+    },
+    {
+      "id": "python-19-member-moderator-slash-command",
+      "language": "python",
+      "family": "member-moderator",
+      "shape": "slash-command",
+      "integration": "intent",
+      "actionType": "MEMBER_KICK",
+      "targetType": "user"
+    },
+    {
+      "id": "python-20-member-moderator-worker-process",
+      "language": "python",
+      "family": "member-moderator",
+      "shape": "worker-process",
+      "integration": "intent",
+      "actionType": "MEMBER_KICK",
+      "targetType": "user"
+    },
+    {
+      "id": "python-21-ban-moderator-minimal",
+      "language": "python",
+      "family": "ban-moderator",
+      "shape": "minimal",
+      "integration": "intent",
+      "actionType": "MEMBER_BAN_ADD",
+      "targetType": "user"
+    },
+    {
+      "id": "python-22-ban-moderator-environment-configured",
+      "language": "python",
+      "family": "ban-moderator",
+      "shape": "environment-configured",
+      "integration": "intent",
+      "actionType": "MEMBER_BAN_ADD",
+      "targetType": "user"
+    },
+    {
+      "id": "python-23-ban-moderator-prefix-command",
+      "language": "python",
+      "family": "ban-moderator",
+      "shape": "prefix-command",
+      "integration": "intent",
+      "actionType": "MEMBER_BAN_ADD",
+      "targetType": "user"
+    },
+    {
+      "id": "python-24-ban-moderator-slash-command",
+      "language": "python",
+      "family": "ban-moderator",
+      "shape": "slash-command",
+      "integration": "intent",
+      "actionType": "MEMBER_BAN_ADD",
+      "targetType": "user"
+    },
+    {
+      "id": "python-25-ban-moderator-worker-process",
+      "language": "python",
+      "family": "ban-moderator",
+      "shape": "worker-process",
+      "integration": "intent",
+      "actionType": "MEMBER_BAN_ADD",
+      "targetType": "user"
+    },
+    {
+      "id": "python-26-invite-helper-minimal",
+      "language": "python",
+      "family": "invite-helper",
+      "shape": "minimal",
+      "integration": "intent",
+      "actionType": "INVITE_CREATE",
+      "targetType": "invite"
+    },
+    {
+      "id": "python-27-invite-helper-environment-configured",
+      "language": "python",
+      "family": "invite-helper",
+      "shape": "environment-configured",
+      "integration": "intent",
+      "actionType": "INVITE_CREATE",
+      "targetType": "invite"
+    },
+    {
+      "id": "python-28-invite-helper-prefix-command",
+      "language": "python",
+      "family": "invite-helper",
+      "shape": "prefix-command",
+      "integration": "intent",
+      "actionType": "INVITE_CREATE",
+      "targetType": "invite"
+    },
+    {
+      "id": "python-29-invite-helper-slash-command",
+      "language": "python",
+      "family": "invite-helper",
+      "shape": "slash-command",
+      "integration": "intent",
+      "actionType": "INVITE_CREATE",
+      "targetType": "invite"
+    },
+    {
+      "id": "python-30-invite-helper-worker-process",
+      "language": "python",
+      "family": "invite-helper",
+      "shape": "worker-process",
+      "integration": "intent",
+      "actionType": "INVITE_CREATE",
+      "targetType": "invite"
+    },
+    {
+      "id": "python-31-event-coordinator-minimal",
+      "language": "python",
+      "family": "event-coordinator",
+      "shape": "minimal",
+      "integration": "intent",
+      "actionType": "GUILD_SCHEDULED_EVENT_UPDATE",
+      "targetType": "scheduled-event"
+    },
+    {
+      "id": "python-32-event-coordinator-environment-configured",
+      "language": "python",
+      "family": "event-coordinator",
+      "shape": "environment-configured",
+      "integration": "intent",
+      "actionType": "GUILD_SCHEDULED_EVENT_UPDATE",
+      "targetType": "scheduled-event"
+    },
+    {
+      "id": "python-33-event-coordinator-prefix-command",
+      "language": "python",
+      "family": "event-coordinator",
+      "shape": "prefix-command",
+      "integration": "intent",
+      "actionType": "GUILD_SCHEDULED_EVENT_UPDATE",
+      "targetType": "scheduled-event"
+    },
+    {
+      "id": "python-34-event-coordinator-slash-command",
+      "language": "python",
+      "family": "event-coordinator",
+      "shape": "slash-command",
+      "integration": "intent",
+      "actionType": "GUILD_SCHEDULED_EVENT_UPDATE",
+      "targetType": "scheduled-event"
+    },
+    {
+      "id": "python-35-event-coordinator-worker-process",
+      "language": "python",
+      "family": "event-coordinator",
+      "shape": "worker-process",
+      "integration": "intent",
+      "actionType": "GUILD_SCHEDULED_EVENT_UPDATE",
+      "targetType": "scheduled-event"
+    },
+    {
+      "id": "python-36-automod-manager-minimal",
+      "language": "python",
+      "family": "automod-manager",
+      "shape": "minimal",
+      "integration": "intent",
+      "actionType": "AUTO_MODERATION_RULE_UPDATE",
+      "targetType": "auto-moderation-rule"
+    },
+    {
+      "id": "python-37-automod-manager-environment-configured",
+      "language": "python",
+      "family": "automod-manager",
+      "shape": "environment-configured",
+      "integration": "intent",
+      "actionType": "AUTO_MODERATION_RULE_UPDATE",
+      "targetType": "auto-moderation-rule"
+    },
+    {
+      "id": "python-38-automod-manager-prefix-command",
+      "language": "python",
+      "family": "automod-manager",
+      "shape": "prefix-command",
+      "integration": "intent",
+      "actionType": "AUTO_MODERATION_RULE_UPDATE",
+      "targetType": "auto-moderation-rule"
+    },
+    {
+      "id": "python-39-automod-manager-slash-command",
+      "language": "python",
+      "family": "automod-manager",
+      "shape": "slash-command",
+      "integration": "intent",
+      "actionType": "AUTO_MODERATION_RULE_UPDATE",
+      "targetType": "auto-moderation-rule"
+    },
+    {
+      "id": "python-40-automod-manager-worker-process",
+      "language": "python",
+      "family": "automod-manager",
+      "shape": "worker-process",
+      "integration": "intent",
+      "actionType": "AUTO_MODERATION_RULE_UPDATE",
+      "targetType": "auto-moderation-rule"
+    },
+    {
+      "id": "python-41-thread-support-minimal",
+      "language": "python",
+      "family": "thread-support",
+      "shape": "minimal",
+      "integration": "intent",
+      "actionType": "THREAD_CREATE",
+      "targetType": "thread"
+    },
+    {
+      "id": "python-42-thread-support-environment-configured",
+      "language": "python",
+      "family": "thread-support",
+      "shape": "environment-configured",
+      "integration": "intent",
+      "actionType": "THREAD_CREATE",
+      "targetType": "thread"
+    },
+    {
+      "id": "python-43-thread-support-prefix-command",
+      "language": "python",
+      "family": "thread-support",
+      "shape": "prefix-command",
+      "integration": "intent",
+      "actionType": "THREAD_CREATE",
+      "targetType": "thread"
+    },
+    {
+      "id": "python-44-thread-support-slash-command",
+      "language": "python",
+      "family": "thread-support",
+      "shape": "slash-command",
+      "integration": "intent",
+      "actionType": "THREAD_CREATE",
+      "targetType": "thread"
+    },
+    {
+      "id": "python-45-thread-support-worker-process",
+      "language": "python",
+      "family": "thread-support",
+      "shape": "worker-process",
+      "integration": "intent",
+      "actionType": "THREAD_CREATE",
+      "targetType": "thread"
+    },
+    {
+      "id": "python-46-permission-manager-minimal",
+      "language": "python",
+      "family": "permission-manager",
+      "shape": "minimal",
+      "integration": "intent",
+      "actionType": "CHANNEL_OVERWRITE_UPDATE",
+      "targetType": "overwrite"
+    },
+    {
+      "id": "python-47-permission-manager-environment-configured",
+      "language": "python",
+      "family": "permission-manager",
+      "shape": "environment-configured",
+      "integration": "intent",
+      "actionType": "CHANNEL_OVERWRITE_UPDATE",
+      "targetType": "overwrite"
+    },
+    {
+      "id": "python-48-permission-manager-prefix-command",
+      "language": "python",
+      "family": "permission-manager",
+      "shape": "prefix-command",
+      "integration": "intent",
+      "actionType": "CHANNEL_OVERWRITE_UPDATE",
+      "targetType": "overwrite"
+    },
+    {
+      "id": "python-49-permission-manager-slash-command",
+      "language": "python",
+      "family": "permission-manager",
+      "shape": "slash-command",
+      "integration": "intent",
+      "actionType": "CHANNEL_OVERWRITE_UPDATE",
+      "targetType": "overwrite"
+    },
+    {
+      "id": "python-50-permission-manager-worker-process",
+      "language": "python",
+      "family": "permission-manager",
+      "shape": "worker-process",
+      "integration": "intent",
+      "actionType": "CHANNEL_OVERWRITE_UPDATE",
+      "targetType": "overwrite"
+    }
+  ]
+}

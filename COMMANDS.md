@@ -95,6 +95,8 @@ These commands are for maintainers testing a disposable guild. They require `DIS
 | Command | Arguments | What it verifies | Example |
 | --- | --- | --- | --- |
 | `npm run live-test:chaos` | `PARITY_CHAOS_MUTATIONS` from 100 through 1,000 | At least 100 real tracked bot messages reconcile, then a real audit-log channel update reconciles after the burst. | `$env:PARITY_CHAOS_MUTATIONS = '100'; npm run live-test:chaos` |
+| `npm run test:bot-matrix` | None | Runs each of the 100 copyable bot examples before and after its intended Parity integration. | `npm run test:bot-matrix` |
+| `npm run live-test:bot-matrix` | None | Sends one baseline and one tracked output for each catalog bot in a disposable channel. | `npm run live-test:bot-matrix` |
 | `npm run capture:audits --` | `--count`, `--timeout-ms`, `--output` | Captures anonymized audit payload shapes for review during a Discord or discord.js upgrade. | `npm run capture:audits -- --count 25 --output parity-spec/observed-fixtures/upgrade.json` |
 
 See [Audit fixture capture](docs/audit-fixtures.md) before committing a capture. The tool replaces identifiers and timestamps and excludes raw change values.
